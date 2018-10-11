@@ -16,4 +16,8 @@ RUN sudo apt-get update \
  && chmod -R a+w $RUSTUP_HOME $CARGO_HOME \
  && rustup --version && cargo --version && rustc --version
 
+RUN wget https://github.com/ROCm-Developer-Tools/hcc2/releases/download/rel_0.5-3/hcc2_0.5-3_amd64.deb \
+ && sudo dpkg -i hcc2_0.5-3_amd64.deb \
+ && rm hcc2_0.5-3_amd64.deb
+
 ENV LIBRARY_PATH=/opt/rocm/lib:/opt/rocm/hsa/lib:/opt/rocm/hip/lib:/opt/rocm/hcc/lib
