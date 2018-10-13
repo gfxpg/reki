@@ -70,6 +70,50 @@ of the executable `.hsaco` file (obtained via `cloc.sh -mcpu gfx900 -s source.cl
 The generated source is shorter than the snippet I got from `cl_asm`, as it
 omits both flat scratch setup and the `get_global_id` call.
 
+### Revisiting amd_kernel_code_t
+
+The initial state of scalar general-purpose registers (SGPRs, starting with `s`)
+depends on the settings in `amd_kernel_code_t`, so naturally, I'd need to know
+them first before trying to make sense of the program.
+
+The listing produced by `cl_asm` has a readable set of key-value pairs for
+`amd_kernel_code_t`, but unfortunately they do not match the object produced
+by `cloc.sh`. The reason for that is that the latter performs several steps
+to produce the binary (run `cloc.sh -mcpu gfx900 -n source.cl` to see them),
+one of which is optimization. It is responsible for inlinining our `get_global_id`
+call and further simplyfing the assembly, resulting in a slightly different
+initial kernel configuration.
+
+I couldn't find a way to dump `amd_kernel_code_t` from one of the intermediate
+steps, so I decided I could extract it from the `.hsaco` binary.
+
+The object is located in the first 256 bytes of the `.text` section.
+Since `.hsaco` is an ELF, the data can be extracted using standard Linux utilities:
+
+```bash
+objdump -s -j .text binary.hsaco | head -n 20
+```
+
+The layout is defined in
+[AMDKernelCodeT.h](https://github.com/llvm-mirror/llvm/blob/993ef0ca960f8ffd107c33bfbf1fd603bcf5c66c/lib/Target/AMDGPU/AMDKernelCodeT.h#L528).
+
+### The program itself
+
+Based on the initial kernel state, this is what I think the register layout looks like,
+but I have yet to verify it:
+
+```
+# set up by CP, apply to all wavefronts of the grid
+
+s0 - s3: private segment buffer (?), since enable_sgpr_private_segment_buffer = 1
+s4 - s5: kernarg segment address, since enable_sgpr_kernarg_segment_ptr = 1
+s6 - s7: flat scratch address (see below), since enable_sgpr_flat_scratch_init = 1
+
+# ...
+```
+
+Now, let's try to make sense of what the kernel is doing:
+
 ```asm
 s_load_dword s2, s[4:5], 0x4
 s_load_dwordx2 s[0:1], s[6:7], 0x0
@@ -86,20 +130,6 @@ v_add_co_u32_e32 v2, vcc, s0, v2
 v_addc_co_u32_e32 v3, vcc, v0, v3, vcc
 global_store_dword v[2:3], v1, off
 s_endpgm
-```
-
-The initial state of scalar general-purpose registers (SGPRs, starting with `s`)
-depends on the settings in `amd_kernel_code_t`. This is what I think the layout
-looks like, but I have yet to verify it:
-
-```
-# set up by CP, apply to all wavefronts of the grid
-
-s0 - s3: private segment buffer (?), since enable_sgpr_private_segment_buffer = 1
-s4 - s5: kernarg segment address, since enable_sgpr_kernarg_segment_ptr = 1
-s6 - s7: flat scratch address (see below), since enable_sgpr_flat_scratch_init = 1
-
-# ...
 ```
 
 [To be continued...](https://youtu.be/cPCLFtxpadE)
