@@ -21,3 +21,5 @@ control flow constructs, data types, and intrinsic functions.
 
 A Docker image with the Rust toolchain and ROCm development tools is available
 on Docker Hub as [timlathy/reki](https://hub.docker.com/r/timlathy/reki/).
+
+See the `docs/` directory for more information on the target ISA.
