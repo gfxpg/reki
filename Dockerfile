@@ -20,4 +20,9 @@ RUN wget https://github.com/ROCm-Developer-Tools/hcc2/releases/download/rel_0.5-
  && sudo dpkg -i hcc2_0.5-3_amd64.deb \
  && rm hcc2_0.5-3_amd64.deb
 
+# cloc.sh requires hexdump to produce disassembled listings
+RUN sudo apt-get update \
+ && sudo apt-get install -y bsdmainutils \
+ && sudo rm -rf /var/lib/apt/lists/*
+
 ENV LIBRARY_PATH=/opt/rocm/lib:/opt/rocm/hsa/lib:/opt/rocm/hip/lib:/opt/rocm/hcc/lib
