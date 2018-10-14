@@ -1,0 +1,77 @@
+#!/usr/bin/c
+// Requires https://github.com/ryanmjacobs/c
+// vim: syntax=c
+
+#include <stdio.h>
+#include <unistd.h>
+#include <stdint.h>
+
+#include <AMDKernelCodeT.h>
+
+int main(int argc, char** argv) {
+  amd_kernel_code_t kernel_code;
+  if (read(0, &kernel_code, sizeof(amd_kernel_code_t)) != sizeof(amd_kernel_code_t)) {
+    fprintf(stderr, "Unable to read the struct from stdin\n");
+    return 1;
+  }
+
+  printf("amd_kernel_code_version_major: %lu\n", (unsigned long) kernel_code.amd_kernel_code_version_major);
+  printf("amd_kernel_code_version_minor: %lu\n", (unsigned long) kernel_code.amd_kernel_code_version_minor);
+  printf("amd_machine_kind: %lu\n", (unsigned long) kernel_code.amd_machine_kind);
+  printf("amd_machine_version_major: %lu\n", (unsigned long) kernel_code.amd_machine_version_major);
+  printf("amd_machine_version_minor: %lu\n", (unsigned long) kernel_code.amd_machine_version_minor);
+  printf("amd_machine_version_stepping: %lu\n", (unsigned long) kernel_code.amd_machine_version_stepping);
+
+  printf("kernel_code_entry_byte_offset: %#016lx\n", kernel_code.kernel_code_entry_byte_offset);
+  printf("kernel_code_prefetch_byte_offset: %#016lx\n", kernel_code.kernel_code_prefetch_byte_offset);
+  printf("kernel_code_prefetch_byte_size: %lu\n", (unsigned long) kernel_code.kernel_code_prefetch_byte_size);
+
+  printf("workitem_private_segment_byte_size: %lu\n", (unsigned long) kernel_code.workitem_private_segment_byte_size);
+  printf("workgroup_group_segment_byte_size: %lu\n", (unsigned long) kernel_code.workgroup_group_segment_byte_size);
+
+  printf("gds_segment_byte_size: %lu\n", (unsigned long) kernel_code.gds_segment_byte_size);
+  printf("kernarg_segment_byte_size: %lu\n", (unsigned long) kernel_code.kernarg_segment_byte_size);
+
+  printf("workgroup_fbarrier_count: %lu\n", (unsigned long) kernel_code.workgroup_fbarrier_count);
+  printf("wavefront_sgpr_count: %lu\n", (unsigned long) kernel_code.wavefront_sgpr_count);
+  printf("workitem_vgpr_count: %lu\n", (unsigned long) kernel_code.workitem_vgpr_count);
+  printf("reserved_vgpr_first: %lu\n", (unsigned long) kernel_code.reserved_vgpr_first);
+  printf("reserved_vgpr_count: %lu\n", (unsigned long) kernel_code.reserved_vgpr_count);
+  printf("reserved_sgpr_first: %lu\n", (unsigned long) kernel_code.reserved_sgpr_first);
+  printf("reserved_sgpr_count: %lu\n", (unsigned long) kernel_code.reserved_sgpr_count);
+
+  printf("debug_wavefront_private_segment_offset_sgpr: %lu\n", (unsigned long) kernel_code.debug_wavefront_private_segment_offset_sgpr);
+  printf("debug_private_segment_buffer_sgpr: %lu\n", (unsigned long) kernel_code.debug_private_segment_buffer_sgpr);
+
+  printf("kernarg_segment_alignment: %lu\n", (unsigned long) kernel_code.kernarg_segment_alignment);
+  printf("group_segment_alignment: %lu\n", (unsigned long) kernel_code.group_segment_alignment);
+  printf("private_segment_alignment: %lu\n", (unsigned long) kernel_code.private_segment_alignment);
+
+  printf("wavefront_size: %lu\n", (unsigned long) kernel_code.wavefront_size);
+
+  printf("call_convention: %d\n", kernel_code.call_convention);
+
+  printf("===== compute_pgm_resource_registers: %#016lx =====\n", kernel_code.compute_pgm_resource_registers);
+
+  // TODO: https://github.com/llvm-mirror/llvm/blob/80681820212a43a7cfa5c10cc9cb4b120eb17a9e/include/llvm/Support/AMDHSAKernelDescriptor.h#L79
+
+  printf("===== code_properties =====\n");
+  amd_code_property32_t props = kernel_code.code_properties;
+  if (props & AMD_CODE_PROPERTY_ENABLE_SGPR_PRIVATE_SEGMENT_BUFFER) printf("enable_sgpr_private_segment_buffer = 1\n");
+  if (props & AMD_CODE_PROPERTY_ENABLE_SGPR_DISPATCH_PTR) printf("enable_sgpr_dispatch_ptr = 1\n");
+  if (props & AMD_CODE_PROPERTY_ENABLE_SGPR_QUEUE_PTR) printf("amd_code_property_enable_sgpr_queue_ptr = 1\n");
+  if (props & AMD_CODE_PROPERTY_ENABLE_SGPR_KERNARG_SEGMENT_PTR) printf("enable_sgpr_kernarg_segment_ptr = 1\n");
+  if (props & AMD_CODE_PROPERTY_ENABLE_SGPR_DISPATCH_ID) printf("enable_sgpr_dispatch_id = 1\n");
+  if (props & AMD_CODE_PROPERTY_ENABLE_SGPR_FLAT_SCRATCH_INIT) printf("enable_sgpr_flat_scratch_init = 1\n");
+  if (props & AMD_CODE_PROPERTY_ENABLE_SGPR_PRIVATE_SEGMENT_SIZE) printf("enable_sgpr_private_segment_size = 1\n");
+  if (props & AMD_CODE_PROPERTY_ENABLE_SGPR_GRID_WORKGROUP_COUNT_X) printf("enable_sgpr_grid_workgroup_count_x = 1\n");
+  if (props & AMD_CODE_PROPERTY_ENABLE_SGPR_GRID_WORKGROUP_COUNT_Y) printf("enable_sgpr_grid_workgroup_count_y = 1\n");
+  if (props & AMD_CODE_PROPERTY_ENABLE_SGPR_GRID_WORKGROUP_COUNT_Z) printf("enable_sgpr_grid_workgroup_count_z = 1\n");
+  if (props & AMD_CODE_PROPERTY_ENABLE_ORDERED_APPEND_GDS) printf("enable_ordered_append_gds = 1\n");
+  if (props & AMD_CODE_PROPERTY_IS_PTR64) printf("is_ptr64 = 1\n");
+  if (props & AMD_CODE_PROPERTY_IS_DYNAMIC_CALLSTACK) printf("is_dynamic_callstack = 1\n");
+  if (props & AMD_CODE_PROPERTY_IS_DEBUG_SUPPORTED) printf("is_debug_supported = 1\n");
+  if (props & AMD_CODE_PROPERTY_IS_XNACK_SUPPORTED) printf("is_xnack_supported = 1\n");
+  
+  return 0;
+}
