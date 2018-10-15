@@ -87,12 +87,17 @@ initial kernel configuration.
 I couldn't find a way to dump `amd_kernel_code_t` from one of the intermediate
 steps, so I decided I could extract it from the `.hsaco` binary.
 
-The object is located in the first 256 bytes of the `.text` section.
-Since `.hsaco` is an ELF, the data can be extracted using standard Linux utilities:
+The object is located in the first 256 bytes of the `.text` section, and
+since `.hsaco` is an ELF, the data can be extracted using standard Linux utilities:
 
 ```bash
-objdump -s -j .text binary.hsaco | head -n 20
+objdump -s --section=.text binary.hsaco | head -n 20
 ```
+
+A hexdump is not very helpful by itself; a lot of information there is packed into
+bitfields, not really intended to be analyzed by eye. I wrote a small script
+(available in `bin/print_amd_kernel_code_t`) to output a human-readable
+`amd_kernel_code_t` from a `.hsaco` file.
 
 The layout is defined in
 [AMDKernelCodeT.h](https://github.com/llvm-mirror/llvm/blob/993ef0ca960f8ffd107c33bfbf1fd603bcf5c66c/lib/Target/AMDGPU/AMDKernelCodeT.h#L528).

@@ -1,0 +1,163 @@
+#!/usr/bin/c
+// Requires https://github.com/ryanmjacobs/c
+// vim: syntax=c
+
+#include <stdio.h>
+#include <unistd.h>
+#include <stdint.h>
+
+#include <AMDKernelCodeT.h>
+
+// Source: https://github.com/llvm-mirror/llvm/blob/80681820212a43a7cfa5c10cc9cb4b120eb17a9e/include/llvm/Support/AMDHSAKernelDescriptor.h#L79
+#define AMDHSA_BITS_ENUM_ENTRY(NAME, SHIFT, WIDTH) \
+  NAME ## _SHIFT = (SHIFT),                        \
+  NAME ## _WIDTH = (WIDTH),                        \
+  NAME = (((1 << (WIDTH)) - 1) << (SHIFT))
+
+#define AMDHSA_BITS_GET(SRC, MSK) ((SRC & MSK) >> MSK ## _SHIFT)
+
+#define COMPUTE_PGM_RSRC1(NAME, SHIFT, WIDTH) \
+  AMDHSA_BITS_ENUM_ENTRY(COMPUTE_PGM_RSRC1_ ## NAME, SHIFT, WIDTH)
+enum PGM_RSRC1 {
+  COMPUTE_PGM_RSRC1(GRANULATED_WORKITEM_VGPR_COUNT, 0, 6),
+  COMPUTE_PGM_RSRC1(GRANULATED_WAVEFRONT_SGPR_COUNT, 6, 4),
+  COMPUTE_PGM_RSRC1(PRIORITY, 10, 2),
+  COMPUTE_PGM_RSRC1(FLOAT_ROUND_MODE_32, 12, 2),
+  COMPUTE_PGM_RSRC1(FLOAT_ROUND_MODE_16_64, 14, 2),
+  COMPUTE_PGM_RSRC1(FLOAT_DENORM_MODE_32, 16, 2),
+  COMPUTE_PGM_RSRC1(FLOAT_DENORM_MODE_16_64, 18, 2),
+  COMPUTE_PGM_RSRC1(PRIV, 20, 1),
+  COMPUTE_PGM_RSRC1(ENABLE_DX10_CLAMP, 21, 1),
+  COMPUTE_PGM_RSRC1(DEBUG_MODE, 22, 1),
+  COMPUTE_PGM_RSRC1(ENABLE_IEEE_MODE, 23, 1),
+  COMPUTE_PGM_RSRC1(BULKY, 24, 1),
+  COMPUTE_PGM_RSRC1(CDBG_USER, 25, 1),
+  COMPUTE_PGM_RSRC1(FP16_OVFL, 26, 1), // GFX9+
+  COMPUTE_PGM_RSRC1(RESERVED0, 27, 5),
+};
+
+#define COMPUTE_PGM_RSRC2(NAME, SHIFT, WIDTH) \
+  AMDHSA_BITS_ENUM_ENTRY(COMPUTE_PGM_RSRC2_ ## NAME, SHIFT, WIDTH)
+enum PGM_RSRC2 {
+  COMPUTE_PGM_RSRC2(ENABLE_SGPR_PRIVATE_SEGMENT_WAVEFRONT_OFFSET, 0, 1),
+  COMPUTE_PGM_RSRC2(USER_SGPR_COUNT, 1, 5),
+  COMPUTE_PGM_RSRC2(ENABLE_TRAP_HANDLER, 6, 1),
+  COMPUTE_PGM_RSRC2(ENABLE_SGPR_WORKGROUP_ID_X, 7, 1),
+  COMPUTE_PGM_RSRC2(ENABLE_SGPR_WORKGROUP_ID_Y, 8, 1),
+  COMPUTE_PGM_RSRC2(ENABLE_SGPR_WORKGROUP_ID_Z, 9, 1),
+  COMPUTE_PGM_RSRC2(ENABLE_SGPR_WORKGROUP_INFO, 10, 1),
+  COMPUTE_PGM_RSRC2(ENABLE_VGPR_WORKITEM_ID, 11, 2),
+  COMPUTE_PGM_RSRC2(ENABLE_EXCEPTION_ADDRESS_WATCH, 13, 1),
+  COMPUTE_PGM_RSRC2(ENABLE_EXCEPTION_MEMORY, 14, 1),
+  COMPUTE_PGM_RSRC2(GRANULATED_LDS_SIZE, 15, 9),
+  COMPUTE_PGM_RSRC2(ENABLE_EXCEPTION_IEEE_754_FP_INVALID_OPERATION, 24, 1),
+  COMPUTE_PGM_RSRC2(ENABLE_EXCEPTION_FP_DENORMAL_SOURCE, 25, 1),
+  COMPUTE_PGM_RSRC2(ENABLE_EXCEPTION_IEEE_754_FP_DIVISION_BY_ZERO, 26, 1),
+  COMPUTE_PGM_RSRC2(ENABLE_EXCEPTION_IEEE_754_FP_OVERFLOW, 27, 1),
+  COMPUTE_PGM_RSRC2(ENABLE_EXCEPTION_IEEE_754_FP_UNDERFLOW, 28, 1),
+  COMPUTE_PGM_RSRC2(ENABLE_EXCEPTION_IEEE_754_FP_INEXACT, 29, 1),
+  COMPUTE_PGM_RSRC2(ENABLE_EXCEPTION_INT_DIVIDE_BY_ZERO, 30, 1),
+  COMPUTE_PGM_RSRC2(RESERVED0, 31, 1),
+};
+
+int main(int argc, char** argv) {
+  amd_kernel_code_t kernel_code;
+  if (read(0, &kernel_code, sizeof(amd_kernel_code_t)) != sizeof(amd_kernel_code_t)) {
+    fprintf(stderr, "Unable to read the struct from stdin\n");
+    return 1;
+  }
+
+  printf("amd_kernel_code_version_major: %lu\n", (unsigned long) kernel_code.amd_kernel_code_version_major);
+  printf("amd_kernel_code_version_minor: %lu\n", (unsigned long) kernel_code.amd_kernel_code_version_minor);
+  printf("amd_machine_kind: %lu\n", (unsigned long) kernel_code.amd_machine_kind);
+  printf("amd_machine_version_major: %lu\n", (unsigned long) kernel_code.amd_machine_version_major);
+  printf("amd_machine_version_minor: %lu\n", (unsigned long) kernel_code.amd_machine_version_minor);
+  printf("amd_machine_version_stepping: %lu\n", (unsigned long) kernel_code.amd_machine_version_stepping);
+
+  printf("kernel_code_entry_byte_offset: %#016lx\n", kernel_code.kernel_code_entry_byte_offset);
+  printf("kernel_code_prefetch_byte_offset: %#016lx\n", kernel_code.kernel_code_prefetch_byte_offset);
+  printf("kernel_code_prefetch_byte_size: %lu\n", (unsigned long) kernel_code.kernel_code_prefetch_byte_size);
+
+  printf("workitem_private_segment_byte_size: %lu\n", (unsigned long) kernel_code.workitem_private_segment_byte_size);
+  printf("workgroup_group_segment_byte_size: %lu\n", (unsigned long) kernel_code.workgroup_group_segment_byte_size);
+
+  printf("gds_segment_byte_size: %lu\n", (unsigned long) kernel_code.gds_segment_byte_size);
+  printf("kernarg_segment_byte_size: %lu\n", (unsigned long) kernel_code.kernarg_segment_byte_size);
+
+  printf("workgroup_fbarrier_count: %lu\n", (unsigned long) kernel_code.workgroup_fbarrier_count);
+  printf("wavefront_sgpr_count: %lu\n", (unsigned long) kernel_code.wavefront_sgpr_count);
+  printf("workitem_vgpr_count: %lu\n", (unsigned long) kernel_code.workitem_vgpr_count);
+  printf("reserved_vgpr_first: %lu\n", (unsigned long) kernel_code.reserved_vgpr_first);
+  printf("reserved_vgpr_count: %lu\n", (unsigned long) kernel_code.reserved_vgpr_count);
+  printf("reserved_sgpr_first: %lu\n", (unsigned long) kernel_code.reserved_sgpr_first);
+  printf("reserved_sgpr_count: %lu\n", (unsigned long) kernel_code.reserved_sgpr_count);
+
+  printf("debug_wavefront_private_segment_offset_sgpr: %lu\n", (unsigned long) kernel_code.debug_wavefront_private_segment_offset_sgpr);
+  printf("debug_private_segment_buffer_sgpr: %lu\n", (unsigned long) kernel_code.debug_private_segment_buffer_sgpr);
+
+  printf("kernarg_segment_alignment: %lu\n", (unsigned long) kernel_code.kernarg_segment_alignment);
+  printf("group_segment_alignment: %lu\n", (unsigned long) kernel_code.group_segment_alignment);
+  printf("private_segment_alignment: %lu\n", (unsigned long) kernel_code.private_segment_alignment);
+
+  printf("wavefront_size: %lu\n", (unsigned long) kernel_code.wavefront_size);
+
+  printf("call_convention: %d\n", kernel_code.call_convention);
+
+  printf("===== compute_pgm_resource_registers: %#016lx =====\n", kernel_code.compute_pgm_resource_registers);
+  int32_t pgm_rsrc1 = kernel_code.compute_pgm_resource_registers;
+  printf("===== compute_pgm_rsrc1: %#08x =====\n", pgm_rsrc1);
+  printf("granulated_workitem_vgpr_count: %d\n", AMDHSA_BITS_GET(pgm_rsrc1, COMPUTE_PGM_RSRC1_GRANULATED_WORKITEM_VGPR_COUNT));
+  printf("granulated_wavefront_sgpr_count: %d\n", AMDHSA_BITS_GET(pgm_rsrc1, COMPUTE_PGM_RSRC1_GRANULATED_WAVEFRONT_SGPR_COUNT));
+  printf("priority: %d\n", AMDHSA_BITS_GET(pgm_rsrc1, COMPUTE_PGM_RSRC1_PRIORITY));
+  printf("float_round_mode_32: %d\n", AMDHSA_BITS_GET(pgm_rsrc1, COMPUTE_PGM_RSRC1_FLOAT_ROUND_MODE_32));
+  printf("float_round_mode_16_64: %d\n", AMDHSA_BITS_GET(pgm_rsrc1, COMPUTE_PGM_RSRC1_FLOAT_ROUND_MODE_16_64));
+  printf("float_denorm_mode_32: %d\n", AMDHSA_BITS_GET(pgm_rsrc1, COMPUTE_PGM_RSRC1_FLOAT_DENORM_MODE_32));
+  printf("float_denorm_mode_16_64: %d\n", AMDHSA_BITS_GET(pgm_rsrc1, COMPUTE_PGM_RSRC1_FLOAT_DENORM_MODE_16_64));
+  printf("priv: %d\n", AMDHSA_BITS_GET(pgm_rsrc1, COMPUTE_PGM_RSRC1_PRIV));
+  printf("enable_dx10_clamp: %d\n", AMDHSA_BITS_GET(pgm_rsrc1, COMPUTE_PGM_RSRC1_ENABLE_DX10_CLAMP));
+  printf("debug_mode: %d\n", AMDHSA_BITS_GET(pgm_rsrc1, COMPUTE_PGM_RSRC1_DEBUG_MODE));
+  printf("enable_ieee_mode: %d\n", AMDHSA_BITS_GET(pgm_rsrc1, COMPUTE_PGM_RSRC1_ENABLE_IEEE_MODE));
+  printf("bulky: %d\n", AMDHSA_BITS_GET(pgm_rsrc1, COMPUTE_PGM_RSRC1_BULKY));
+  printf("cdbg_user: %d\n", AMDHSA_BITS_GET(pgm_rsrc1, COMPUTE_PGM_RSRC1_CDBG_USER));
+  printf("fp16_ovfl: %d\n", AMDHSA_BITS_GET(pgm_rsrc1, COMPUTE_PGM_RSRC1_FP16_OVFL));
+  int32_t pgm_rsrc2 = kernel_code.compute_pgm_resource_registers >> 32;
+  printf("===== compute_pgm_rsrc2: %#08x =====\n", pgm_rsrc2);
+  printf("enable_sgpr_private_segment_wavefront_offset: %d\n", AMDHSA_BITS_GET(pgm_rsrc2, COMPUTE_PGM_RSRC2_ENABLE_SGPR_PRIVATE_SEGMENT_WAVEFRONT_OFFSET));
+  printf("user_sgpr_count: %d\n", AMDHSA_BITS_GET(pgm_rsrc2, COMPUTE_PGM_RSRC2_USER_SGPR_COUNT));
+  printf("enable_trap_handler: %d\n", AMDHSA_BITS_GET(pgm_rsrc2, COMPUTE_PGM_RSRC2_ENABLE_TRAP_HANDLER));
+  printf("enable_sgpr_workgroup_id_x: %d\n", AMDHSA_BITS_GET(pgm_rsrc2, COMPUTE_PGM_RSRC2_ENABLE_SGPR_WORKGROUP_ID_X));
+  printf("enable_sgpr_workgroup_id_y: %d\n", AMDHSA_BITS_GET(pgm_rsrc2, COMPUTE_PGM_RSRC2_ENABLE_SGPR_WORKGROUP_ID_Y));
+  printf("enable_sgpr_workgroup_id_z: %d\n", AMDHSA_BITS_GET(pgm_rsrc2, COMPUTE_PGM_RSRC2_ENABLE_SGPR_WORKGROUP_ID_Z));
+  printf("enable_sgpr_workgroup_info: %d\n", AMDHSA_BITS_GET(pgm_rsrc2, COMPUTE_PGM_RSRC2_ENABLE_SGPR_WORKGROUP_INFO));
+  printf("enable_vgpr_workitem_id: %d\n", AMDHSA_BITS_GET(pgm_rsrc2, COMPUTE_PGM_RSRC2_ENABLE_VGPR_WORKITEM_ID));
+  printf("enable_exception_address_watch: %d\n", AMDHSA_BITS_GET(pgm_rsrc2, COMPUTE_PGM_RSRC2_ENABLE_EXCEPTION_ADDRESS_WATCH));
+  printf("enable_exception_memory: %d\n", AMDHSA_BITS_GET(pgm_rsrc2, COMPUTE_PGM_RSRC2_ENABLE_EXCEPTION_MEMORY));
+  printf("granulated_lds_size: %d\n", AMDHSA_BITS_GET(pgm_rsrc2, COMPUTE_PGM_RSRC2_GRANULATED_LDS_SIZE));
+  printf("enable_exception_ieee_754_fp_invalid_operation: %d\n", AMDHSA_BITS_GET(pgm_rsrc2, COMPUTE_PGM_RSRC2_ENABLE_EXCEPTION_IEEE_754_FP_INVALID_OPERATION));
+  printf("enable_exception_fp_denormal_source: %d\n", AMDHSA_BITS_GET(pgm_rsrc2, COMPUTE_PGM_RSRC2_ENABLE_EXCEPTION_FP_DENORMAL_SOURCE));
+  printf("enable_exception_ieee_754_fp_division_by_zero: %d\n", AMDHSA_BITS_GET(pgm_rsrc2, COMPUTE_PGM_RSRC2_ENABLE_EXCEPTION_IEEE_754_FP_DIVISION_BY_ZERO));
+  printf("enable_exception_ieee_754_fp_overflow: %d\n", AMDHSA_BITS_GET(pgm_rsrc2, COMPUTE_PGM_RSRC2_ENABLE_EXCEPTION_IEEE_754_FP_OVERFLOW));
+  printf("enable_exception_ieee_754_fp_undeflow: %d\n", AMDHSA_BITS_GET(pgm_rsrc2, COMPUTE_PGM_RSRC2_ENABLE_EXCEPTION_IEEE_754_FP_UNDERFLOW));
+  printf("enable_exception_ieee_754_fp_inexact: %d\n", AMDHSA_BITS_GET(pgm_rsrc2, COMPUTE_PGM_RSRC2_ENABLE_EXCEPTION_IEEE_754_FP_INEXACT));
+  printf("enable_exception_int_divide_by_zero: %d\n", AMDHSA_BITS_GET(pgm_rsrc2, COMPUTE_PGM_RSRC2_ENABLE_EXCEPTION_INT_DIVIDE_BY_ZERO));
+
+  printf("===== code_properties =====\n");
+  amd_code_property32_t props = kernel_code.code_properties;
+  if (props & AMD_CODE_PROPERTY_ENABLE_SGPR_PRIVATE_SEGMENT_BUFFER) printf("enable_sgpr_private_segment_buffer = 1\n");
+  if (props & AMD_CODE_PROPERTY_ENABLE_SGPR_DISPATCH_PTR) printf("enable_sgpr_dispatch_ptr = 1\n");
+  if (props & AMD_CODE_PROPERTY_ENABLE_SGPR_QUEUE_PTR) printf("amd_code_property_enable_sgpr_queue_ptr = 1\n");
+  if (props & AMD_CODE_PROPERTY_ENABLE_SGPR_KERNARG_SEGMENT_PTR) printf("enable_sgpr_kernarg_segment_ptr = 1\n");
+  if (props & AMD_CODE_PROPERTY_ENABLE_SGPR_DISPATCH_ID) printf("enable_sgpr_dispatch_id = 1\n");
+  if (props & AMD_CODE_PROPERTY_ENABLE_SGPR_FLAT_SCRATCH_INIT) printf("enable_sgpr_flat_scratch_init = 1\n");
+  if (props & AMD_CODE_PROPERTY_ENABLE_SGPR_PRIVATE_SEGMENT_SIZE) printf("enable_sgpr_private_segment_size = 1\n");
+  if (props & AMD_CODE_PROPERTY_ENABLE_SGPR_GRID_WORKGROUP_COUNT_X) printf("enable_sgpr_grid_workgroup_count_x = 1\n");
+  if (props & AMD_CODE_PROPERTY_ENABLE_SGPR_GRID_WORKGROUP_COUNT_Y) printf("enable_sgpr_grid_workgroup_count_y = 1\n");
+  if (props & AMD_CODE_PROPERTY_ENABLE_SGPR_GRID_WORKGROUP_COUNT_Z) printf("enable_sgpr_grid_workgroup_count_z = 1\n");
+  if (props & AMD_CODE_PROPERTY_ENABLE_ORDERED_APPEND_GDS) printf("enable_ordered_append_gds = 1\n");
+  if (props & AMD_CODE_PROPERTY_IS_PTR64) printf("is_ptr64 = 1\n");
+  if (props & AMD_CODE_PROPERTY_IS_DYNAMIC_CALLSTACK) printf("is_dynamic_callstack = 1\n");
+  if (props & AMD_CODE_PROPERTY_IS_DEBUG_SUPPORTED) printf("is_debug_supported = 1\n");
+  if (props & AMD_CODE_PROPERTY_IS_XNACK_SUPPORTED) printf("is_xnack_supported = 1\n");
+  
+  return 0;
+}
