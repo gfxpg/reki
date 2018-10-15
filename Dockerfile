@@ -34,6 +34,6 @@ RUN wget https://raw.githubusercontent.com/ryanmjacobs/c/master/c \
 RUN sudo wget https://raw.githubusercontent.com/llvm-mirror/llvm/993ef0ca960f8ffd107c33bfbf1fd603bcf5c66c/lib/Target/AMDGPU/AMDKernelCodeT.h -P /usr/local/include/ \
  && sudo sed '/#include "llvm/d;s/cstddef/stddef.h/;s/cstdint/stdint.h/' -i /usr/local/include/AMDKernelCodeT.h
 
-ENV CC=gcc
-
-ENV LIBRARY_PATH=/opt/rocm/lib:/opt/rocm/hsa/lib:/opt/rocm/hip/lib:/opt/rocm/hcc/lib
+ENV CC=gcc \
+  PATH="/src/bin:${PATH}" \
+  LIBRARY_PATH=/opt/rocm/lib:/opt/rocm/hsa/lib:/opt/rocm/hip/lib:/opt/rocm/hcc/lib
