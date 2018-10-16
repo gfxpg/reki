@@ -1,0 +1,9 @@
+[package]
+name = "reki"
+version = "0.1.0"
+authors = ["timlathy <tim.labushev@gmail.com>"]
+
+[dependencies]
+libc = "0.2"
+llvm-sys = "70"
+elf = "0.0.10"

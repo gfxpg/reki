@@ -21,17 +21,18 @@ RUN wget https://github.com/ROCm-Developer-Tools/hcc2/releases/download/rel_0.5-
  && rm hcc2_0.5-3_amd64.deb
 
 # hexdump (bsdmainutils) is required by cloc.sh to produce disassembled listings
-RUN sudo apt-get update \
- && sudo apt-get install -y bsdmainutils \
+RUN sudo sh -c "echo 'deb http://apt.llvm.org/xenial/ llvm-toolchain-xenial-7 maindeb-src http://apt.llvm.org/xenial/ llvm-toolchain-xenial-7 main' > /etc/apt/sources.list.d/llvm.list" \
+ && sudo sh -c "echo 'deb-src http://apt.llvm.org/xenial/ llvm-toolchain-xenial-7 main' >> /etc/apt/sources.list.d/llvm.list" \
+ && wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key | sudo apt-key add - \
+ && sudo apt-get update \
+ && sudo apt-get install -y bsdmainutils zlib1g-dev llvm-7 \
  && sudo rm -rf /var/lib/apt/lists/*
 
-# Run C source files as CLI scripts
+# Required by bin/ scripts
 RUN wget https://raw.githubusercontent.com/ryanmjacobs/c/master/c \
  && sudo install -m 755 c /usr/bin/c \
- && rm ./c
-
-# Required for amd_kernel_code_t printing 
-RUN sudo wget https://raw.githubusercontent.com/llvm-mirror/llvm/993ef0ca960f8ffd107c33bfbf1fd603bcf5c66c/lib/Target/AMDGPU/AMDKernelCodeT.h -P /usr/local/include/ \
+ && rm ./c \
+ && sudo wget https://raw.githubusercontent.com/llvm-mirror/llvm/993ef0ca960f8ffd107c33bfbf1fd603bcf5c66c/lib/Target/AMDGPU/AMDKernelCodeT.h -P /usr/local/include/ \
  && sudo sed '/#include "llvm/d;s/cstddef/stddef.h/;s/cstdint/stdint.h/' -i /usr/local/include/AMDKernelCodeT.h
 
 ENV CC=gcc \
