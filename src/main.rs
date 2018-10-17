@@ -1,6 +1,14 @@
+#![feature(try_from)]
+
 extern crate llvm_sys;
 extern crate libc;
 extern crate elf;
+extern crate byteorder;
+
+mod kernel_code_object;
+
+use kernel_code_object::KernelCodeObject;
+use std::convert::TryFrom;
 
 use std::path::PathBuf;
 use std::ffi::CString;
@@ -14,7 +22,9 @@ fn main() {
     }
     let hsaco = elf::File::open_path(&PathBuf::from(&args[1])).unwrap();
     let mut pgm_data = hsaco.get_section(".text").unwrap().data.to_owned();
-    let (_amd_kernel_code, instructions) = pgm_data.split_at_mut(256);
+    let (amd_kernel_code_raw, instructions) = pgm_data.split_at_mut(256);
+    let kernel_code_obj = KernelCodeObject::try_from(amd_kernel_code_raw as &[u8]).unwrap();
+    println!("{:?}", kernel_code_obj);
 
     unsafe {
         llvm_sys::target::LLVM_InitializeAllTargetInfos();

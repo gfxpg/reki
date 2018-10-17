@@ -7,3 +7,4 @@ authors = ["timlathy <tim.labushev@gmail.com>"]
 libc = "0.2"
 llvm-sys = "70"
 elf = "0.0.10"
+byteorder = "1"
