@@ -24,7 +24,7 @@ fn main() {
     let mut pgm_data = hsaco.get_section(".text").unwrap().data.to_owned();
     let (amd_kernel_code_raw, instructions) = pgm_data.split_at_mut(256);
     let kernel_code_obj = KernelCodeObject::try_from(amd_kernel_code_raw as &[u8]).unwrap();
-    println!("{:?}", kernel_code_obj);
+    println!("{:#?}", kernel_code_obj);
 
     unsafe {
         llvm_sys::target::LLVM_InitializeAllTargetInfos();
