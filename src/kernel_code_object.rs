@@ -1,5 +1,5 @@
 #[derive(Default, Debug)]
-pub struct KernelCodeObject {
+pub struct KernelCode {
     kernel_code_version_major: u32,
     kernel_code_version_minor: u32,
     machine_kind: u16,
@@ -185,7 +185,7 @@ macro_rules! get_bitfield {
     }
 }
 
-impl <'a> TryFrom<&'a [u8]> for KernelCodeObject {
+impl <'a> TryFrom<&'a [u8]> for KernelCode {
     type Error = io::Error;
 
     fn try_from(buf: &[u8]) -> Result<Self, io::Error> {
@@ -193,7 +193,7 @@ impl <'a> TryFrom<&'a [u8]> for KernelCodeObject {
             return Err(io::Error::from(io::ErrorKind::InvalidData));
         }
         let mut crs = Cursor::new(buf);
-        let mut obj: KernelCodeObject = std::default::Default::default();
+        let mut obj: KernelCode = Default::default();
 
         obj.kernel_code_version_major = crs.read_u32::<LE>()?;
         obj.kernel_code_version_minor = crs.read_u32::<LE>()?;
