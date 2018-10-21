@@ -6,9 +6,9 @@ extern crate elf;
 extern crate byteorder;
 
 mod kernel_meta;
-mod disasm;
-mod reg_state;
+mod assembly;
 mod eval;
+mod exec_state;
 
 use std::path::PathBuf;
 
@@ -19,13 +19,10 @@ fn main() {
         return;
     }
     let hsaco = elf::File::open_path(&PathBuf::from(&args[1])).unwrap();
-    let (kernel_code, kernel_args, instrs) = disasm::disassemble(hsaco).unwrap();
+    let disassembly = assembly::disassemble(hsaco).unwrap();
 
-    let sgprs = reg_state::initial_sgprs(&kernel_code);
-    let vgprs = reg_state::initial_vgprs(&kernel_code);
+    println!("{:#?}", disassembly.0);
+    println!("Args: {:#?}", disassembly.1);
 
-    println!("{:#?}", kernel_code);
-    println!("Args: {:#?}", kernel_args);
-
-    eval::eval_loads(eval::ExecutionState { instrs, sgprs, vgprs });
+    eval::eval_loads(exec_state::ExecutionState::from(disassembly));
 }

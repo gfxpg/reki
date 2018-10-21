@@ -1,80 +1,44 @@
-use std::ops::RangeInclusive;
+use assembly::Operand;
+use exec_state::ExecutionState;
 
-pub struct ExecutionState {
-    pub sgprs: Vec<&'static str>,
-    pub vgprs: Vec<&'static str>,
-    pub instrs: Vec<String>
-}
-
-#[derive(Debug)]
-enum Operand {
-    ScalarReg(u8),
-    VectorReg(u8),
-    ScalarRegRange(RangeInclusive<u8>),
-    VectorRegRange(RangeInclusive<u8>),
-    Lit(u32),
-    VCC,
-    Keyseq(String)
-}
-
-fn parse_operand(operand: &str) -> Operand {
-    let op_start_char = operand.chars().nth(0).unwrap();
-
-    if operand == "vcc" {
-        Operand::VCC
-    }
-    else if operand.len() > 2 && &operand[0..2] == "0x" {
-        Operand::Lit(u32::from_str_radix(&operand[2..], 16).unwrap())
-    }
-    else if op_start_char.is_digit(10) {
-        Operand::Lit(u32::from_str_radix(operand, 10).unwrap())
-    }
-    else if operand.starts_with("s") || operand.starts_with("v") {
-        match operand[1..].parse::<u8>() {
-            Ok(i) =>
-                if operand.starts_with("s") {
-                    Operand::ScalarReg(i)
-                }
-                else {
-                    Operand::VectorReg(i)
-                }
-            _ => {
-                if &operand[1..2] != "[" {
-                    panic!("unable to parse \"{}\" as an instruction operand", operand)
-                }
-
-                let sides: Vec<&str> = operand[2..operand.len() - 1].split(':').collect();
-                let left = sides[0].parse::<u8>().unwrap();
-                let right = sides[1].parse::<u8>().unwrap();
-
-                if operand.starts_with("s") {
-                    Operand::ScalarRegRange(left..=right)
-                }
-                else {
-                    Operand::VectorRegRange(left..=right)
-                }
-            }
-        }
-    }
-    else {
-        Operand::Keyseq(operand.to_string())
-    }
-}
-
-fn parse_instr(instr: &str) -> (&str, Vec<Operand>) {
-    let instr_ops: Vec<&str> = instr.splitn(2, ' ').collect();
-    if instr_ops.len() == 1 {
-        (instr_ops[0], Vec::new())
-    }
-    else {
-        (instr_ops[0], instr_ops[1].split(", ").map(parse_operand).collect())
+fn resolve_load<'a>(st: &'a ExecutionState, mem_loc: &str, offset: u32) -> &'a str {
+    match mem_loc {
+        "AQL_DISPATCH_PACKET" =>
+            match offset {
+                4 => "get_local_size(0)",
+                _ => panic!("Unable to resolve offset into AQL_DISPATCH_PACKET struct")
+            },
+        "KERNARG" =>
+            st.kernel_args.iter()
+                .find(|arg| arg.offset == offset)
+                .map(|arg| match arg.name.as_str() {
+                    "HiddenGlobalOffsetX" => "get_global_offset(0)",
+                    _ => arg.name.as_str()
+                })
+                .expect("Unable to resolve offset into kernel arguments"),
+        _ =>
+            panic!("Unable to resolve {} (offset {})", mem_loc, offset)
     }
 }
 
 pub fn eval_loads(st: ExecutionState) {
-    for i in st.instrs.iter() {
-        let (instr, ops) = parse_instr(i);
+    for (instr, ops) in st.instrs.iter() {
         println!("{} {:?}", instr, ops);
+
+        if instr == "s_load_dword" {
+            if let Operand::ScalarRegRange(ref rng) = ops[1] {
+                if let Operand::Lit(ref offset) = ops[2] {
+                    let (lo, hi) = (rng.start(), rng.end());
+                    assert!(hi - lo == 1);
+                    let loc = st.sgprs[*lo];
+                    assert!(loc == st.sgprs[*hi], "lower and higher dwords of load source point to different locations");
+
+                    let contents = resolve_load(&st, loc, *offset);
+
+                    println!("addr: {} {} -> {}", st.sgprs[*lo], st.sgprs[*hi], contents);
+                }
+            }
+        }
     }
 }
 
