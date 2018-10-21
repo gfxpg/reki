@@ -3,9 +3,9 @@ use std::ffi::CString;
 use std::convert::TryFrom;
 use llvm_sys::disassembler::{LLVMCreateDisasmCPU, LLVMDisasmInstruction, LLVMDisasmDispose};
 
-use kernel_code_object::KernelCode;
+use kernel_meta::{extract_kernel_args, KernelCode, KernelArg};
 
-pub fn disassemble(bin: elf::File) -> io::Result<(KernelCode, Vec<String>)> {
+pub fn disassemble(bin: elf::File) -> io::Result<(KernelCode, Vec<KernelArg>, Vec<String>)> {
     let mut pgm_data = bin
         .get_section(".text")
         .ok_or(io::Error::new(io::ErrorKind::InvalidData, "missing .text section"))?
@@ -16,12 +16,18 @@ pub fn disassemble(bin: elf::File) -> io::Result<(KernelCode, Vec<String>)> {
             "program text must be at least 256 bytes long (the size of AMDKernelCodeT struct)"));
     }
 
+    let pgm_note = bin
+        .get_section(".note")
+        .ok_or(io::Error::new(io::ErrorKind::InvalidData, "missing .note section with OpenCL metadata"))?;
+
+    let args = extract_kernel_args(&pgm_note.data);
+
     let (amd_kernel_code_raw, instructions_raw) = pgm_data.split_at_mut(256);
 
     let code_obj = KernelCode::try_from(amd_kernel_code_raw as &[u8])?;
     let instructions = disassemble_instructions(instructions_raw)?;
 
-    Ok((code_obj, instructions))
+    Ok((code_obj, args, instructions))
 }
 
 fn disassemble_instructions(instructions_raw: &mut [u8]) -> io::Result<Vec<String>> {

@@ -5,7 +5,7 @@ extern crate libc;
 extern crate elf;
 extern crate byteorder;
 
-mod kernel_code_object;
+mod kernel_meta;
 mod disasm;
 mod reg_state;
 mod eval;
@@ -19,12 +19,13 @@ fn main() {
         return;
     }
     let hsaco = elf::File::open_path(&PathBuf::from(&args[1])).unwrap();
-    let (kernel_code, instrs) = disasm::disassemble(hsaco).unwrap();
+    let (kernel_code, kernel_args, instrs) = disasm::disassemble(hsaco).unwrap();
 
     let sgprs = reg_state::initial_sgprs(&kernel_code);
     let vgprs = reg_state::initial_vgprs(&kernel_code);
 
     println!("{:#?}", kernel_code);
+    println!("Args: {:#?}", kernel_args);
 
     eval::eval_loads(eval::ExecutionState { instrs, sgprs, vgprs });
 }

@@ -1,4 +1,4 @@
-use kernel_code_object::{KernelCode, VGPRWorkItemId};
+use kernel_meta::{KernelCode, VGPRWorkItemId};
 
 pub fn initial_sgprs(kcode: &KernelCode) -> Vec<&'static str> {
     let mut sgprs: Vec<&'static str> = Vec::with_capacity(16);
