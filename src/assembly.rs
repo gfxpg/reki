@@ -1,7 +1,6 @@
 use std::io;
 use std::ffi::CString;
 use std::convert::TryFrom;
-use std::ops::RangeInclusive;
 use llvm_sys::disassembler::{LLVMCreateDisasmCPU, LLVMDisasmInstruction, LLVMDisasmDispose};
 
 use kernel_meta::{extract_kernel_args, KernelCode, KernelArg};
@@ -10,10 +9,10 @@ pub type Instruction = (String, Vec<Operand>);
 
 #[derive(Debug)]
 pub enum Operand {
-    ScalarReg(u8),
-    VectorReg(u8),
-    ScalarRegRange(RangeInclusive<usize>),
-    VectorRegRange(RangeInclusive<usize>),
+    SReg(usize),
+    VReg(usize),
+    SRegs(usize, usize),
+    VRegs(usize, usize),
     Lit(u32),
     VCC,
     Keyseq(String)
@@ -119,19 +118,19 @@ impl <'a> From<&'a str> for Operand {
         if prefix_char != 's' && prefix_char != 'v' {
             return Operand::Keyseq(operand.to_string());
         }
-        match operand[1..].parse::<u8>() {
+        match operand[1..].parse::<usize>() {
             Ok(i) =>
                 /* Single register reference (s0, v1) */
-                if prefix_char == 's' { Operand::ScalarReg(i) }
-                else                  { Operand::VectorReg(i) }
+                if prefix_char == 's' { Operand::SReg(i) }
+                else                  { Operand::VReg(i) }
             _ => {
                 /* Register range (s[2:3], v[8:9]) */
                 let sides: Vec<&str> = operand[2..operand.len() - 1].split(':').collect();
-                let left = sides[0].parse::<usize>().unwrap();
-                let right = sides[1].parse::<usize>().unwrap();
+                let from = sides[0].parse::<usize>().unwrap();
+                let to = sides[1].parse::<usize>().unwrap();
 
-                if prefix_char == 's' { Operand::ScalarRegRange(left..=right) }
-                else                  { Operand::VectorRegRange(left..=right) }
+                if prefix_char == 's' { Operand::SRegs(from, to) }
+                else                  { Operand::VRegs(from, to) }
             }
         }
     }

@@ -1,4 +1,5 @@
 #![feature(try_from)]
+#![feature(slice_patterns)]
 
 extern crate llvm_sys;
 extern crate libc;
@@ -24,5 +25,10 @@ fn main() {
     println!("{:#?}", disassembly.0);
     println!("Args: {:#?}", disassembly.1);
 
-    eval::eval_loads(exec_state::ExecutionState::from(disassembly));
+    let mut state = exec_state::ExecutionState::from(disassembly);
+
+    eval::eval_pgm(&mut state);
+
+    println!("SGRPs: {:?}", state.sgprs);
+    println!("VGRPs: {:?}", state.vgprs);
 }

@@ -2,8 +2,8 @@ use kernel_meta::{KernelArg, VGPRWorkItemId};
 use assembly::{Disassembly, Instruction};
 
 pub struct ExecutionState {
-    pub sgprs: Vec<&'static str>,
-    pub vgprs: Vec<&'static str>,
+    pub sgprs: Vec<String>,
+    pub vgprs: Vec<String>,
     pub kernel_args: Vec<KernelArg>,
     pub instrs: Vec<Instruction>
 }
@@ -46,13 +46,13 @@ impl From<Disassembly> for ExecutionState {
             sgprs.push("WORKGROUP_COUNT_Z");
         }
         if kcode.pgm_props.enable_sgpr_workgroup_id_x {
-            sgprs.push("WORKGROUP_ID_X");
+            sgprs.push("get_group_id(0)");
         }
         if kcode.pgm_props.enable_sgpr_workgroup_id_y {
-            sgprs.push("WORKGROUP_ID_Y");
+            sgprs.push("get_group_id(1)");
         }
         if kcode.pgm_props.enable_sgpr_workgroup_id_z {
-            sgprs.push("WORKGROUP_ID_Z");
+            sgprs.push("get_group_id(2)");
         }
         if kcode.pgm_props.enable_sgpr_workgroup_info {
             sgprs.push("WORKGROUP_INFO");
@@ -63,11 +63,16 @@ impl From<Disassembly> for ExecutionState {
 
         /* https://llvm.org/docs/AMDGPUUsage.html#amdgpu-amdhsa-vgpr-register-set-up-order-table */
         let vgprs: Vec<&'static str> = match kcode.pgm_props.enable_vgpr_workitem_id {
-            VGPRWorkItemId::X => vec!["WORKITEM_ID_X"],
-            VGPRWorkItemId::XY => vec!["WORKITEM_ID_X", "WORKITEM_ID_Y"],
-            VGPRWorkItemId::XYZ => vec!["WORKITEM_ID_X", "WORKITEM_ID_Y", "WORKITEM_ID_Z"]
+            VGPRWorkItemId::X => vec!["get_local_id(0)"],
+            VGPRWorkItemId::XY => vec!["get_local_id(0)", "get_local_id(1)"],
+            VGPRWorkItemId::XYZ => vec!["get_local_id(0)", "get_local_id(1)", "get_local_id(2)"]
         };
         
-        ExecutionState { sgprs, vgprs, kernel_args, instrs }
+        ExecutionState {
+            sgprs: sgprs.into_iter().map(|s| s.to_string()).collect(),
+            vgprs: vgprs.into_iter().map(|s| s.to_string()).collect(),
+            kernel_args,
+            instrs
+        }
     }
 }
