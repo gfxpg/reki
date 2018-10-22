@@ -26,9 +26,5 @@ fn main() {
     println!("Args: {:#?}", disassembly.1);
 
     let mut state = exec_state::ExecutionState::from(disassembly);
-
     eval::eval_pgm(&mut state);
-
-    println!("SGRPs: {:?}", state.sgprs);
-    println!("VGRPs: {:?}", state.vgprs);
 }

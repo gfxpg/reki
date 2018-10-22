@@ -7,7 +7,7 @@ use kernel_meta::{extract_kernel_args, KernelCode, KernelArg};
 
 pub type Instruction = (String, Vec<Operand>);
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum Operand {
     SReg(usize),
     VReg(usize),
