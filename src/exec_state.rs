@@ -1,78 +1,98 @@
 use kernel_meta::{KernelArg, VGPRWorkItemId};
 use assembly::{Disassembly, Instruction};
+use expr::{Binding, RegState};
 
 pub struct ExecutionState {
-    pub sgprs: Vec<String>,
-    pub vgprs: Vec<String>,
+    pub sgprs: Vec<RegState>,
+    pub vgprs: Vec<RegState>,
+    pub bindings: Vec<Binding>,
     pub kernel_args: Vec<KernelArg>,
     pub instrs: Vec<Instruction>
+}
+
+macro_rules! bind_init_state {
+    (qword $val:expr, $bindings:expr, $regfile:expr) => {
+        $bindings.push($val);
+        $regfile.push(RegState::QwLo($bindings.len() - 1));
+        $regfile.push(RegState::QwHi($bindings.len() - 1));
+    };
+    (dword $val:expr, $bindings:expr, $regfile:expr) => {
+        $bindings.push($val);
+        $regfile.push(RegState::Dw($bindings.len() - 1));
+    }
 }
 
 impl From<Disassembly> for ExecutionState {
     fn from(disassembly: Disassembly) -> Self {
         let (kcode, kernel_args, instrs) = disassembly;
 
-        let mut sgprs: Vec<&'static str> = Vec::with_capacity(16);
+        let mut sgprs: Vec<RegState> = Vec::with_capacity(16);
+        let mut bindings: Vec<Binding> = Vec::with_capacity(16);
 
         /* https://llvm.org/docs/AMDGPUUsage.html#amdgpu-amdhsa-sgpr-register-set-up-order-table */
         if kcode.code_props.enable_sgpr_private_segment_buffer {
-            sgprs.extend_from_slice(&[""; 4]);
+            bindings.push(Binding::PrivateSegmentBuffer);
+            for _ in 1..=4 { sgprs.push(RegState::Dw(bindings.len() - 1)); }
         }
         if kcode.code_props.enable_sgpr_dispatch_ptr {
-            sgprs.extend_from_slice(&["AQL_DISPATCH_PACKET"; 2]);
+            bind_init_state!(qword Binding::PtrDispatchPacket, bindings, sgprs);
         }
         if kcode.code_props.enable_sgpr_queue_ptr {
-            sgprs.extend_from_slice(&["AMD_QUEUE_T"; 2]);
+            bind_init_state!(qword Binding::PtrQueue, bindings, sgprs);
         }
         if kcode.code_props.enable_sgpr_kernarg_segment_ptr {
-            sgprs.extend_from_slice(&["KERNARG"; 2]);
+            bind_init_state!(qword Binding::PtrKernarg, bindings, sgprs);
         }
         if kcode.code_props.enable_sgpr_dispatch_id {
-            sgprs.extend_from_slice(&["DISPATCH_ID"; 2]);
+            bind_init_state!(qword Binding::DispatchId, bindings, sgprs);
         }
         if kcode.code_props.enable_sgpr_flat_scratch_init {
-            sgprs.extend_from_slice(&["FLAT_SCRATCH_INIT"; 2]);
+            bind_init_state!(qword Binding::FlatScratchInit, bindings, sgprs);
         }
         if kcode.code_props.enable_sgpr_grid_workgroup_count_x {
-            sgprs.push("WORKGROUP_COUNT_X");
+            bind_init_state!(dword Binding::WorkgroupCountX, bindings, sgprs);
         }
         if kcode.code_props.enable_sgpr_grid_workgroup_count_y && sgprs.len() < 16 {
-            sgprs.push("WORKGROUP_COUNT_Y");
+            bind_init_state!(dword Binding::WorkgroupCountY, bindings, sgprs);
         }
         if kcode.code_props.enable_sgpr_grid_workgroup_count_z && sgprs.len() < 16 {
-            sgprs.push("WORKGROUP_COUNT_Z");
-        }
-        if kcode.code_props.enable_sgpr_grid_workgroup_count_z && sgprs.len() < 16 {
-            sgprs.push("WORKGROUP_COUNT_Z");
+            bind_init_state!(dword Binding::WorkgroupCountZ, bindings, sgprs);
         }
         if kcode.pgm_props.enable_sgpr_workgroup_id_x {
-            sgprs.push("get_group_id(0)");
+            bind_init_state!(dword Binding::WorkgroupIdX, bindings, sgprs);
         }
         if kcode.pgm_props.enable_sgpr_workgroup_id_y {
-            sgprs.push("get_group_id(1)");
+            bind_init_state!(dword Binding::WorkgroupIdY, bindings, sgprs);
         }
         if kcode.pgm_props.enable_sgpr_workgroup_id_z {
-            sgprs.push("get_group_id(2)");
+            bind_init_state!(dword Binding::WorkgroupIdZ, bindings, sgprs);
         }
         if kcode.pgm_props.enable_sgpr_workgroup_info {
-            sgprs.push("WORKGROUP_INFO");
+            bind_init_state!(dword Binding::WorkgroupInfo, bindings, sgprs);
         }
         if kcode.pgm_props.enable_sgpr_private_segment_wavefront_offset {
-            sgprs.push("PRIVATE_SEGMENT_WAVEFRONT_OFFSET");
+            bind_init_state!(dword Binding::PrivateSegmentWavefrontOffset, bindings, sgprs);
         }
 
         /* https://llvm.org/docs/AMDGPUUsage.html#amdgpu-amdhsa-vgpr-register-set-up-order-table */
-        let vgprs: Vec<&'static str> = match kcode.pgm_props.enable_vgpr_workitem_id {
-            VGPRWorkItemId::X => vec!["get_local_id(0)"],
-            VGPRWorkItemId::XY => vec!["get_local_id(0)", "get_local_id(1)"],
-            VGPRWorkItemId::XYZ => vec!["get_local_id(0)", "get_local_id(1)", "get_local_id(2)"]
+        let vgprs: Vec<RegState> = match kcode.pgm_props.enable_vgpr_workitem_id {
+            VGPRWorkItemId::X => {
+                bindings.push(Binding::WorkitemIdX);
+                vec![RegState::Dw(bindings.len() - 1)]
+            },
+            VGPRWorkItemId::XY => {
+                bindings.push(Binding::WorkitemIdX);
+                bindings.push(Binding::WorkitemIdY);
+                vec![RegState::Dw(bindings.len() - 2), RegState::Dw(bindings.len() - 1)]
+            },
+            VGPRWorkItemId::XYZ => {
+                bindings.push(Binding::WorkitemIdX);
+                bindings.push(Binding::WorkitemIdY);
+                bindings.push(Binding::WorkitemIdZ);
+                vec![RegState::Dw(bindings.len() - 3), RegState::Dw(bindings.len() - 2), RegState::Dw(bindings.len() - 1)]
+            }
         };
         
-        ExecutionState {
-            sgprs: sgprs.into_iter().map(|s| s.to_string()).collect(),
-            vgprs: vgprs.into_iter().map(|s| s.to_string()).collect(),
-            kernel_args,
-            instrs
-        }
+        ExecutionState { sgprs, vgprs, kernel_args, bindings, instrs }
     }
 }

@@ -16,5 +16,5 @@ knowledge and time constraints.
 A Docker image with the Rust toolchain and ROCm development tools is available
 on Docker Hub as [timlathy/reki](https://hub.docker.com/r/timlathy/reki/).
 
-Run it with `docker run -it --rm -v \`pwd\`:/src timlathy/reki`, assuming
+Run it with `docker run -it --rm -v $(pwd):/src timlathy/reki`, assuming
 the current working directory is the root of this repository.

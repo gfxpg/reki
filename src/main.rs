@@ -9,6 +9,7 @@ extern crate byteorder;
 mod kernel_meta;
 mod assembly;
 mod eval;
+mod expr;
 mod exec_state;
 
 use std::path::PathBuf;
@@ -26,5 +27,7 @@ fn main() {
     println!("Args: {:#?}", disassembly.1);
 
     let mut state = exec_state::ExecutionState::from(disassembly);
-    eval::eval_pgm(&mut state);
+
+    println!("Expression tree: {:#?}", eval::eval_pgm(&mut state));
+    println!("Bindings: {:#?}", state.bindings);
 }
