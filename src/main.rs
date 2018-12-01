@@ -21,13 +21,13 @@ fn main() {
         return;
     }
     let hsaco = elf::File::open_path(&PathBuf::from(&args[1])).unwrap();
-    let disassembly = assembly::disassemble(hsaco).unwrap();
+    let (kcode, kernel_args, instructions) = assembly::disassemble(hsaco).unwrap();
 
-    println!("{:#?}", disassembly.0);
-    println!("Args: {:#?}", disassembly.1);
+    println!("{:#?}", kcode);
+    println!("Args: {:#?}", kernel_args);
 
-    let mut state = exec_state::ExecutionState::from(disassembly);
+    let mut state = exec_state::ExecutionState::from(kcode);
 
-    println!("Expression tree: {:#?}", eval::eval_pgm(&mut state));
+    println!("Expression tree: {:#?}", eval::eval_pgm(&mut state, instructions));
     println!("Bindings: {:#?}", state.bindings);
 }

@@ -1,38 +1,33 @@
-use kernel_meta::{KernelArg, VGPRWorkItemId};
-use assembly::{Disassembly, Instruction};
-use expr::{Binding, RegState};
+use kernel_meta::{KernelCode, VGPRWorkItemId};
+use expr::{Binding, Reg};
 
 pub struct ExecutionState {
-    pub sgprs: Vec<RegState>,
-    pub vgprs: Vec<RegState>,
-    pub bindings: Vec<Binding>,
-    pub kernel_args: Vec<KernelArg>,
-    pub instrs: Vec<Instruction>
+    pub sgprs: Vec<Reg>,
+    pub vgprs: Vec<Reg>,
+    pub bindings: Vec<Binding>
 }
 
 macro_rules! bind_init_state {
     (qword $val:expr, $bindings:expr, $regfile:expr) => {
         $bindings.push($val);
-        $regfile.push(RegState::QwLo($bindings.len() - 1));
-        $regfile.push(RegState::QwHi($bindings.len() - 1));
+        $regfile.push(Reg($bindings.len() - 1, 0));
+        $regfile.push(Reg($bindings.len() - 1, 1));
     };
     (dword $val:expr, $bindings:expr, $regfile:expr) => {
         $bindings.push($val);
-        $regfile.push(RegState::Dw($bindings.len() - 1));
+        $regfile.push(Reg($bindings.len() - 1, 0));
     }
 }
 
-impl From<Disassembly> for ExecutionState {
-    fn from(disassembly: Disassembly) -> Self {
-        let (kcode, kernel_args, instrs) = disassembly;
-
-        let mut sgprs: Vec<RegState> = Vec::with_capacity(16);
+impl From<KernelCode> for ExecutionState {
+    fn from(kcode: KernelCode) -> Self {
+        let mut sgprs: Vec<Reg> = Vec::with_capacity(16);
         let mut bindings: Vec<Binding> = Vec::with_capacity(16);
 
         /* https://llvm.org/docs/AMDGPUUsage.html#amdgpu-amdhsa-sgpr-register-set-up-order-table */
         if kcode.code_props.enable_sgpr_private_segment_buffer {
             bindings.push(Binding::PrivateSegmentBuffer);
-            for _ in 1..=4 { sgprs.push(RegState::Dw(bindings.len() - 1)); }
+            for i in 0..4 { sgprs.push(Reg(bindings.len() - 1, i)); }
         }
         if kcode.code_props.enable_sgpr_dispatch_ptr {
             bind_init_state!(qword Binding::PtrDispatchPacket, bindings, sgprs);
@@ -75,24 +70,24 @@ impl From<Disassembly> for ExecutionState {
         }
 
         /* https://llvm.org/docs/AMDGPUUsage.html#amdgpu-amdhsa-vgpr-register-set-up-order-table */
-        let vgprs: Vec<RegState> = match kcode.pgm_props.enable_vgpr_workitem_id {
+        let vgprs: Vec<Reg> = match kcode.pgm_props.enable_vgpr_workitem_id {
             VGPRWorkItemId::X => {
                 bindings.push(Binding::WorkitemIdX);
-                vec![RegState::Dw(bindings.len() - 1)]
+                vec![Reg(bindings.len() - 1, 0)]
             },
             VGPRWorkItemId::XY => {
                 bindings.push(Binding::WorkitemIdX);
                 bindings.push(Binding::WorkitemIdY);
-                vec![RegState::Dw(bindings.len() - 2), RegState::Dw(bindings.len() - 1)]
+                vec![Reg(bindings.len() - 2, 0), Reg(bindings.len() - 1, 0)]
             },
             VGPRWorkItemId::XYZ => {
                 bindings.push(Binding::WorkitemIdX);
                 bindings.push(Binding::WorkitemIdY);
                 bindings.push(Binding::WorkitemIdZ);
-                vec![RegState::Dw(bindings.len() - 3), RegState::Dw(bindings.len() - 2), RegState::Dw(bindings.len() - 1)]
+                vec![Reg(bindings.len() - 3, 0), Reg(bindings.len() - 2, 0), Reg(bindings.len() - 1, 0)]
             }
         };
         
-        ExecutionState { sgprs, vgprs, kernel_args, bindings, instrs }
+        ExecutionState { sgprs, vgprs, bindings }
     }
 }

@@ -1,15 +1,12 @@
 pub type BindingIdx = usize;
+pub type DwordIdx = u8;
 
 #[derive(Debug, Copy, Clone)]
-pub enum RegState {
-    QwHi(BindingIdx),
-    QwLo(BindingIdx),
-    Dw(BindingIdx)
-}
+pub struct Reg(pub BindingIdx, pub DwordIdx);
 
 #[derive(Debug)]
 pub enum DataSize {
-    Dword, Qword
+    Dword, Qword, DQword
 }
 
 #[derive(Debug)]

@@ -93,6 +93,9 @@ fn parse_instruction(instr: &str) -> Instruction {
     if instr_ops.len() == 1 {
         (instr_name, Vec::new())
     }
+    else if instr_name == "s_waitcnt" {
+        (instr_name, vec![Operand::Keyseq(instr_ops[1].to_owned())])
+    }
     else {
         (instr_name, instr_ops[1].split(", ").map(Operand::from).collect())
     }
