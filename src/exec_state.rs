@@ -1,10 +1,12 @@
 use kernel_meta::{KernelCode, VGPRWorkItemId};
-use expr::{Binding, Reg};
+use expr::{Binding, Reg, Condition};
 
 pub struct ExecutionState {
     pub sgprs: Vec<Reg>,
     pub vgprs: Vec<Reg>,
-    pub bindings: Vec<Binding>
+    pub bindings: Vec<Binding>,
+    pub vcc: Option<Condition>,
+    pub scc: Option<Condition>
 }
 
 use std::fmt;
@@ -16,7 +18,8 @@ impl fmt::Debug for ExecutionState {
             write!(f, "{:4} {:?}\n", i, binding)?;
         }
         write!(f, "SGPRS: {:?}\n", self.sgprs.iter().enumerate().collect::<Vec<(usize, &Reg)>>())?;
-        write!(f, "VGPRS: {:?}", self.vgprs.iter().enumerate().collect::<Vec<(usize, &Reg)>>())
+        write!(f, "VGPRS: {:?}\n", self.vgprs.iter().enumerate().collect::<Vec<(usize, &Reg)>>())?;
+        write!(f, "SCC: {:?}, VCC: {:?}", self.scc, self.vcc)
     }
 }
 
@@ -101,6 +104,6 @@ impl From<KernelCode> for ExecutionState {
             }
         };
         
-        ExecutionState { sgprs, vgprs, bindings }
+        ExecutionState { sgprs, vgprs, bindings, scc: None, vcc: None }
     }
 }

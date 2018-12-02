@@ -43,3 +43,13 @@ pub enum Expr {
     Add(BindingIdx, BindingIdx),
     And(BindingIdx, u32)
 }
+
+#[derive(Debug)]
+pub enum Statement {
+    JumpIf { cond: Condition, instr_offset: i16 }
+}
+
+#[derive(Debug, Copy, Clone)]
+pub enum Condition {
+    Lt(BindingIdx, BindingIdx)
+}

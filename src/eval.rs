@@ -1,5 +1,7 @@
 use exec_state::ExecutionState;
-use expr::{Reg, Expr, Binding, BindingIdx, DataKind};
+use expr::{Reg, Expr, Statement, Condition, Binding, BindingIdx, DataKind};
+
+pub type FlatProgram = Vec<(usize, Statement)>;
 
 macro_rules! insert_into {
     ($vec:expr, $index:expr, $contents:expr) => {
@@ -93,6 +95,13 @@ fn eval_salu_op(st: &mut ExecutionState, instr: &str, ops: &[Operand]) {
             st.bindings.push(Binding::Computed { expr, kind });
             insert_into!(st.sgprs, *dst, Reg(st.bindings.len() - 1, 0));
         },
+        ("s_cmp_lt_i32", [op1, op2]) =>
+            match (operand_reg(st, op1, "i32"), operand_reg(st, op2, "i32")) {
+                (Reg(op1_idx, 0), Reg(op2_idx, 0)) => {
+                    st.scc = Some(Condition::Lt(op1_idx, op2_idx))
+                },
+                other => panic!("Unrecognized operands: {:?}", other)
+            },
         unsupported => panic!("Operation not supported: {:?}", unsupported)
     }
 }
@@ -176,16 +185,22 @@ fn eval_valu_op(st: &mut ExecutionState, instr: &str, ops: &[Operand]) {
     }
 }
 
-pub fn eval_pgm(st: &mut ExecutionState, instrs: Vec<Instruction>) -> Vec<Expr> {
-    let mut instr_iter = instrs.iter().peekable();
+pub fn eval_pgm(st: &mut ExecutionState, instrs: Vec<Instruction>) -> FlatProgram {
+    let mut instr_iter = instrs.iter().enumerate().peekable();
 
-    let mut exprs: Vec<Expr> = Vec::new();
+    let mut pgm: FlatProgram = Vec::new();
 
-    while let Some((instr, ops)) = instr_iter.next() {
-        println!("{:?}\n\n~~~~~~~~~ {} {:?}", st, instr, ops);
+    while let Some((instr_idx, (instr, ops))) = instr_iter.next() {
+        println!("{:?}\n\n~~~~~~~~~ {} {} {:?}", st, instr_idx + 1, instr, ops);
 
         match instr.as_str() {
             "s_waitcnt" => (),
+            "s_cbranch_scc1" => match ops.as_slice() {
+                [Lit(ref offset)] => pgm.push((instr_idx + 1, Statement::JumpIf {
+                    cond: st.scc.unwrap().to_owned(), instr_offset: *offset as i16
+                })),
+                _ => ()
+            },
             instr if instr.starts_with("s_load") =>
                 eval_s_load(st, instr, ops.as_slice()),
             instr if instr.starts_with("global_load") =>
@@ -196,7 +211,9 @@ pub fn eval_pgm(st: &mut ExecutionState, instrs: Vec<Instruction>) -> Vec<Expr> 
                 eval_valu_op(st, instr, ops.as_slice()),
             unsupported => panic!("Operation not supported: {:?}", unsupported)
         }
+
+        println!("Program: {:?}", pgm);
     }
 
-    exprs
+    pgm
 }
