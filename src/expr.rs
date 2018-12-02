@@ -38,5 +38,6 @@ pub enum Binding {
 #[derive(Debug)]
 pub enum Expr {
     Mul(BindingIdx, BindingIdx),
+    Add(BindingIdx, BindingIdx),
     And(BindingIdx, u32)
 }
