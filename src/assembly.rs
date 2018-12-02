@@ -15,6 +15,7 @@ pub enum Operand {
     VRegs(usize, usize),
     Lit(u32),
     VCC,
+    Offset(u16),
     Keyseq(String)
 }
 
@@ -97,7 +98,9 @@ fn parse_instruction(instr: &str) -> Instruction {
         (instr_name, vec![Operand::Keyseq(instr_ops[1].to_owned())])
     }
     else {
-        (instr_name, instr_ops[1].split(", ").map(Operand::from).collect())
+        let operands = instr_ops[1]
+            .replace(",", "").split(" ").map(Operand::from).collect();
+        (instr_name, operands)
     }
 }
 
@@ -106,18 +109,21 @@ impl <'a> From<&'a str> for Operand {
         if operand == "vcc" {
             return Operand::VCC;
         }
+        if operand.starts_with("offset:") {
+            return Operand::Offset(u16::from_str_radix(&operand[7..], 10).unwrap());
+        }
         /* Hexadecimal literal */
         if operand.len() > 2 && &operand[0..2] == "0x" {
-            return Operand::Lit(u32::from_str_radix(&operand[2..], 16).unwrap())
+            return Operand::Lit(u32::from_str_radix(&operand[2..], 16).unwrap());
         }
 
         let prefix_char = operand.chars().nth(0).unwrap();
 
         /* Decimal literal */
         if prefix_char.is_digit(10) {
-            return Operand::Lit(u32::from_str_radix(operand, 10).unwrap())
+            return Operand::Lit(u32::from_str_radix(operand, 10).unwrap());
         }
-        /* Not a scalar/vector general-purpose register */
+        /* Catch-all for non-GPR operands */
         if prefix_char != 's' && prefix_char != 'v' {
             return Operand::Keyseq(operand.to_string());
         }

@@ -1,5 +1,5 @@
 use exec_state::ExecutionState;
-use expr::{Reg, Expr, Binding, BindingIdx, DataSize};
+use expr::{Reg, Expr, Binding, BindingIdx, DataKind};
 
 macro_rules! insert_into {
     ($vec:expr, $index:expr, $contents:expr) => {
@@ -29,15 +29,15 @@ fn eval_s_load(st: &mut ExecutionState, instr: &str, ops: &[Operand]) {
 
     match (instr, ops) {
         ("s_load_dword", [SReg(ref dst), _, _]) => {
-            st.bindings.push(Binding::Deref { ptr, offset: *offset, size: DataSize::Dword });
+            st.bindings.push(Binding::Deref { ptr, offset: *offset, kind: DataKind::Dword });
             insert_into!(st.sgprs, *dst, Reg(st.bindings.len() - 1, 0));
         },
         ("s_load_dwordx2", [SRegs(ref dst_lo, ref dst_hi), _, _]) => {
-            st.bindings.push(Binding::Deref { ptr, offset: *offset, size: DataSize::Qword });
+            st.bindings.push(Binding::Deref { ptr, offset: *offset, kind: DataKind::Qword });
             for i in 0..2 { insert_into!(st.sgprs, *dst_lo + i as usize, Reg(st.bindings.len() - 1, i)); }
         },
         ("s_load_dwordx4", [SRegs(ref dst_lo, _), _, _]) => {
-            st.bindings.push(Binding::Deref { ptr, offset: *offset, size: DataSize::DQword });
+            st.bindings.push(Binding::Deref { ptr, offset: *offset, kind: DataKind::DQword });
             for i in 0..4 { insert_into!(st.sgprs, *dst_lo + i as usize, Reg(st.bindings.len() - 1, i)); }
         },
         _ => panic!("Operation not supported: {:?} {:?}", instr, ops)
@@ -82,7 +82,7 @@ pub fn eval_pgm(st: &mut ExecutionState, instrs: Vec<Instruction>) -> Vec<Expr> 
                         panic!("Operation not supported: s_mul_i32 {:?} {:?}", st.sgprs[*op1], st.sgprs[*op2])
                     }
                 };
-                st.bindings.push(Binding::Computed { expr, size: DataSize::Dword });
+                st.bindings.push(Binding::Computed { expr, kind: DataKind::Dword });
                 insert_into!(st.vgprs, *dst, Reg(st.bindings.len() - 1, 0));
             },
 //            ("v_add_u32_e32", [VReg(ref dst), op1, op2]) => {

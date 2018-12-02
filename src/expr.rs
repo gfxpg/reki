@@ -5,15 +5,15 @@ pub type DwordIdx = u8;
 pub struct Reg(pub BindingIdx, pub DwordIdx);
 
 #[derive(Debug)]
-pub enum DataSize {
-    Dword, Qword, DQword
+pub enum DataKind {
+    Dword, Qword, DQword, U16
 }
 
 #[derive(Debug)]
 pub enum Binding {
     U32(u32),
-    Deref { ptr: BindingIdx, offset: u32, size: DataSize },
-    Computed { expr: Expr, size: DataSize },
+    Deref { ptr: BindingIdx, offset: u32, kind: DataKind },
+    Computed { expr: Expr, kind: DataKind },
 
     /* Built-ins (initial register state) */
     PrivateSegmentBuffer,
