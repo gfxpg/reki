@@ -12,8 +12,10 @@ pub enum DataKind {
 #[derive(Debug)]
 pub enum Binding {
     U32(u32),
+    I32(i32),
     Deref { ptr: BindingIdx, offset: u32, kind: DataKind },
     Computed { expr: Expr, kind: DataKind },
+    DwordElement { of: BindingIdx, dword: u8 },
 
     /* Built-ins (initial register state) */
     PrivateSegmentBuffer,

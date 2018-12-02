@@ -103,11 +103,22 @@ fn operand_reg(st: &mut ExecutionState, op: &Operand, typehint: &str) -> Reg {
         VReg(ref i) => st.vgprs[*i],
         Lit(ref contents) => {
             match typehint {
+                "i32" => st.bindings.push(Binding::I32(*contents as i32)),
                 "u32" | _ => st.bindings.push(Binding::U32(*contents))
             }
             Reg(st.bindings.len() - 1, 0)
         },
         _ => panic!("Unrecognized operand {:?}", op)
+    }
+}
+
+fn operand_binding_dw(st: &mut ExecutionState, op: &Operand, typehint: &str) -> BindingIdx {
+    match operand_reg(st, op, typehint) {
+        Reg(op_idx, 0) => op_idx,
+        Reg(of, dword) => {
+            st.bindings.push(Binding::DwordElement { of, dword });
+            st.bindings.len() - 1
+        }
     }
 }
 
@@ -118,12 +129,16 @@ fn eval_valu_op(st: &mut ExecutionState, instr: &str, ops: &[Operand]) {
             insert_into!(st.vgprs, *dst, contents);
         },
         ("v_add_u32_e32", [VReg(ref dst), op1, op2]) => {
-            let expr = match (operand_reg(st, op1, "u32"), operand_reg(st, op2, "u32")) {
-                (Reg(op1_idx, 0), Reg(op2_idx, 0)) => Expr::Add(op1_idx, op2_idx),
-                other => panic!("Unrecognized operands: {:?}", other)
-            };
-            st.bindings.push(Binding::Computed { expr, kind: DataKind::Dword });
-            insert_into!(st.sgprs, *dst, Reg(st.bindings.len() - 1, 0));
+            let op1_idx = operand_binding_dw(st, op1, "u32");
+            let op2_idx = operand_binding_dw(st, op2, "u32");
+            st.bindings.push(Binding::Computed { expr: Expr::Add(op1_idx, op2_idx), kind: DataKind::Dword });
+            insert_into!(st.vgprs, *dst, Reg(st.bindings.len() - 1, 0));
+        },
+        ("v_mul_lo_u32", [VReg(ref dst), op1, op2]) => {
+            let op1_idx = operand_binding_dw(st, op1, "u32");
+            let op2_idx = operand_binding_dw(st, op2, "u32");
+            st.bindings.push(Binding::Computed { expr: Expr::Mul(op1_idx, op2_idx), kind: DataKind::Dword });
+            insert_into!(st.vgprs, *dst, Reg(st.bindings.len() - 1, 0));
         },
         unsupported => panic!("Operation not supported: {:?}", unsupported)
 //       ("v_ashrrev_i64", [VRegs(ref dst_lo, ref dst_hi), Lit(ref shift), VRegs(ref src_lo, ref src_hi)]) => {
