@@ -7,6 +7,19 @@ pub struct ExecutionState {
     pub bindings: Vec<Binding>
 }
 
+use std::fmt;
+
+impl fmt::Debug for ExecutionState {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "Bindings:\n")?;
+        for (i, ref binding) in self.bindings.iter().enumerate() {
+            write!(f, "{:4} {:?}\n", i, binding)?;
+        }
+        write!(f, "SGPRS: {:?}\n", self.sgprs.iter().enumerate().collect::<Vec<(usize, &Reg)>>())?;
+        write!(f, "VGPRS: {:?}", self.vgprs.iter().enumerate().collect::<Vec<(usize, &Reg)>>())
+    }
+}
+
 macro_rules! bind_init_state {
     (qword $val:expr, $bindings:expr, $regfile:expr) => {
         $bindings.push($val);

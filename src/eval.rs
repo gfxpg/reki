@@ -75,9 +75,7 @@ pub fn eval_pgm(st: &mut ExecutionState, instrs: Vec<Instruction>) -> Vec<Expr> 
     let mut exprs: Vec<Expr> = Vec::new();
 
     while let Some((instr, ops)) = instr_iter.next() {
-        println!("SGRPs: {:?}", st.sgprs);
-        println!("VGRPs: {:?}\n", st.vgprs);
-        println!("===== {} {:?}", instr, ops);
+        println!("{:?}\n\n~~~~~~~~~ {} {:?}", st, instr, ops);
 
         if instr.starts_with("s_load") {
             eval_s_load(st, instr.as_str(), ops.as_slice());
