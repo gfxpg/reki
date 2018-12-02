@@ -37,6 +37,9 @@ pub fn extract_kernel_args(section_note: &Vec<u8>) -> Vec<KernelArg> {
                 .unwrap().to_string();
             let size = args.iter().find(|e| e.starts_with("Size")).unwrap()[5..]
                 .parse::<u32>().unwrap();
+            let alignment = args.iter().find(|e| e.starts_with("Align")).unwrap()[6..]
+                .parse::<u32>().unwrap();
+            offset += offset % alignment;
             offset += size;
             KernelArg { name, size, offset: offset - size }
         })

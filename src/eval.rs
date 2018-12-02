@@ -14,6 +14,30 @@ macro_rules! insert_into {
 
 use assembly::{Instruction, Operand};
 
+fn eval_global_load(st: &mut ExecutionState, instr: &str, ops: &[Operand]) {
+    use assembly::Operand::*;
+
+    let kind = match &instr[12..] {
+        "ushort" => DataKind::U16,
+        _ => panic!("Unknown data type modifier {}", &instr[12..])
+    };
+    let binding = match ops {
+        [_, VRegs(ref src_lo, ref src_hi), _, Offset(ref offset)] => {
+            let ptr = match (st.vgprs[*src_lo], st.vgprs[*src_hi]) {
+                (Reg(idx_lo, 0), Reg(idx_hi, 1)) if idx_lo == idx_hi => idx_lo,
+                _ => panic!("Cannot resolve load, got invalid pointer (lo: #{:?}, hi: #{:?})", src_lo, src_hi)
+            };
+            Binding::Deref { ptr, offset: *offset as u32, kind }
+        },
+        _ => panic!("Cannot resolve load, unrecognized operands #{:?}", ops)
+    };
+    st.bindings.push(binding);
+    match ops[0] {
+        VReg(ref dst) => insert_into!(st.vgprs, *dst, Reg(st.bindings.len() - 1, 0)),
+        _ => ()
+    }
+}
+
 fn eval_s_load(st: &mut ExecutionState, instr: &str, ops: &[Operand]) {
     use assembly::Operand::*;
 
@@ -59,6 +83,10 @@ pub fn eval_pgm(st: &mut ExecutionState, instrs: Vec<Instruction>) -> Vec<Expr> 
             eval_s_load(st, instr.as_str(), ops.as_slice());
             continue;
         }
+        else if instr.starts_with("global_load") {
+            eval_global_load(st, instr.as_str(), ops.as_slice());
+            continue;
+        }
 
         match (instr.as_str(), ops.as_slice()) {
             ("v_mov_b32_e32", [VReg(ref dst), src]) => {
@@ -77,13 +105,22 @@ pub fn eval_pgm(st: &mut ExecutionState, instrs: Vec<Instruction>) -> Vec<Expr> 
                 let expr = match (st.sgprs[*op1], st.sgprs[*op2]) {
                     (Reg(op1_idx, 0), Reg(op2_idx, 0)) =>
                         Expr::Mul(op1_idx, op2_idx),
-                    _ => {
-                        println!("Bindings: {:#?}", st.bindings);
-                        panic!("Operation not supported: s_mul_i32 {:?} {:?}", st.sgprs[*op1], st.sgprs[*op2])
-                    }
+                    _ => panic!("Operation not supported: s_mul_i32 {:?} {:?}", st.sgprs[*op1], st.sgprs[*op2])
                 };
                 st.bindings.push(Binding::Computed { expr, kind: DataKind::Dword });
-                insert_into!(st.vgprs, *dst, Reg(st.bindings.len() - 1, 0));
+                insert_into!(st.sgprs, *dst, Reg(st.bindings.len() - 1, 0));
+            },
+            ("s_and_b32", [SReg(ref dst), SReg(ref src), Lit(ref mask)]) => {
+                let expr = match st.sgprs[*src] {
+                    Reg(src_idx, 0) => Expr::And(src_idx, *mask),
+                    other => panic!("Operand not supported: {:?} in s_and_b32", other)
+                };
+                let kind = match mask {
+                    65535 => DataKind::U16, /* 0xffff is most likely a 32 -> 16 downcast */
+                    _ => DataKind::Dword
+                };
+                st.bindings.push(Binding::Computed { expr, kind });
+                insert_into!(st.sgprs, *dst, Reg(st.bindings.len() - 1, 0));
             },
 //            ("v_add_u32_e32", [VReg(ref dst), op1, op2]) => {
 //                let result = format!("({} + {})", operand!(st, op1), operand!(st, op2));
