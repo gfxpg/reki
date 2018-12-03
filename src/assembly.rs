@@ -13,9 +13,9 @@ pub enum Operand {
     VReg(usize),
     SRegs(usize, usize),
     VRegs(usize, usize),
-    Lit(u32),
+    Lit(i32),
     VCC,
-    Offset(u16),
+    Offset(i32),
     Keyseq(String)
 }
 
@@ -110,18 +110,18 @@ impl <'a> From<&'a str> for Operand {
             return Operand::VCC;
         }
         if operand.starts_with("offset:") {
-            return Operand::Offset(u16::from_str_radix(&operand[7..], 10).unwrap());
+            return Operand::Offset(i32::from_str_radix(&operand[7..], 10).unwrap());
         }
         /* Hexadecimal literal */
         if operand.len() > 2 && &operand[0..2] == "0x" {
-            return Operand::Lit(u32::from_str_radix(&operand[2..], 16).unwrap());
+            return Operand::Lit(i32::from_str_radix(&operand[2..], 16).unwrap());
         }
 
         let prefix_char = operand.chars().nth(0).unwrap();
 
         /* Decimal literal */
-        if prefix_char.is_digit(10) {
-            return Operand::Lit(u32::from_str_radix(operand, 10).unwrap());
+        if prefix_char.is_digit(10) || prefix_char == '-' {
+            return Operand::Lit(i32::from_str_radix(operand, 10).unwrap());
         }
         /* Catch-all for non-GPR operands */
         if prefix_char != 's' && prefix_char != 'v' {

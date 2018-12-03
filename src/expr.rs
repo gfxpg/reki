@@ -13,7 +13,7 @@ pub enum DataKind {
 pub enum Binding {
     U32(u32),
     I32(i32),
-    Deref { ptr: BindingIdx, offset: u32, kind: DataKind },
+    Deref { ptr: BindingIdx, offset: i32, kind: DataKind },
     Computed { expr: Expr, kind: DataKind },
     DwordElement { of: BindingIdx, dword: u8 },
     QwordElement { of: BindingIdx, dword: u8 },
@@ -43,7 +43,7 @@ pub enum Binding {
 pub enum Expr {
     Mul(BindingIdx, BindingIdx),
     Add(BindingIdx, BindingIdx),
-    And(BindingIdx, u32),
+    And(BindingIdx, BindingIdx),
     Shl(BindingIdx, BindingIdx)
 }
 

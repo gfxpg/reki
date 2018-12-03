@@ -40,7 +40,7 @@ fn eval_global_load(st: &mut ExecutionState, instr: &str, ops: &[Operand]) {
     };
     let binding = match ops {
         [_, src, _, Offset(ref offset)] =>
-            Binding::Deref { ptr: load_ptr_binding(st, src), offset: *offset as u32, kind },
+            Binding::Deref { ptr: load_ptr_binding(st, src), offset: *offset, kind },
         [_, src, _] =>
             Binding::Deref { ptr: load_ptr_binding(st, src), offset: 0, kind },
         _ =>
@@ -86,13 +86,14 @@ fn eval_salu_op(st: &mut ExecutionState, instr: &str, ops: &[Operand]) {
             st.bindings.push(Binding::Computed { expr, kind: DataKind::Dword });
             insert_into!(st.sgprs, *dst, Reg(st.bindings.len() - 1, 0));
         },
-        ("s_and_b32", [SReg(ref dst), SReg(ref src), Lit(ref mask)]) => {
+        ("s_and_b32", [SReg(ref dst), SReg(ref src), mask_op]) => {
+            let mask = operand_binding_dw(st, mask_op, "u16");
             let expr = match st.sgprs[*src] {
-                Reg(src_idx, 0) => Expr::And(src_idx, *mask),
+                Reg(src_idx, 0) => Expr::And(src_idx, mask),
                 other => panic!("Operand not supported: {:?} in s_and_b32", other)
             };
-            let kind = match mask {
-                65535 => DataKind::U16, /* 0xffff is most likely a 32 -> 16 downcast */
+            let kind = match st.bindings[mask] {
+                Binding::U32(65535) => DataKind::U16, /* 0xffff is most likely a 32 -> 16 downcast */
                 _ => DataKind::Dword
             };
             st.bindings.push(Binding::Computed { expr, kind });
@@ -115,8 +116,8 @@ fn operand_reg(st: &mut ExecutionState, op: &Operand, typehint: &str) -> Reg {
         VReg(ref i) => st.vgprs[*i],
         Lit(ref contents) => {
             match typehint {
-                "i32" => st.bindings.push(Binding::I32(*contents as i32)),
-                "u32" | _ => st.bindings.push(Binding::U32(*contents))
+                "i32" => st.bindings.push(Binding::I32(*contents)),
+                "u32" | _ => st.bindings.push(Binding::U32(*contents as u32))
             }
             Reg(st.bindings.len() - 1, 0)
         },
