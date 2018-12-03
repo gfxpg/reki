@@ -6,6 +6,9 @@ pub type FlatProgram = Vec<(usize, Statement)>;
 macro_rules! insert_into {
     ($vec:expr, $index:expr, $contents:expr) => {
         if $vec.len() <= $index {
+            while $vec.len() < $index {
+                $vec.push(Reg(std::usize::MAX, 0));
+            }
             $vec.push($contents);
         }
         else {
