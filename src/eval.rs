@@ -149,6 +149,66 @@ fn eval_valu_op(st: &mut ExecutionState, instr: &str, ops: &[Operand]) {
             st.bindings.push(Binding::Computed { expr: Expr::Mul(op1_idx, op2_idx), kind: DataKind::Dword });
             insert_into!(st.vgprs, *dst, Reg(st.bindings.len() - 1, 0));
         },
+        ("v_ashrrev_i32_e32", [VReg(ref dst), Lit(31), VReg(ref src)]) if *dst == *src + 1 => {
+            /* This is most likely sign-extension of i32 to i64 */
+            let Reg(src_idx, _) = st.vgprs[*src];
+            st.bindings.push(Binding::Cast { source: src_idx, kind: DataKind::I64 });
+            for i in 0..2 { insert_into!(st.vgprs, *src + i as usize, Reg(st.bindings.len() - 1, i)); }
+        },
+        ("v_lshlrev_b64", [VRegs(ref dst_lo, _), shift_by, VRegs(ref src_lo, _)]) => {
+            let shift = operand_binding_dw(st, shift_by, "u32");
+            let Reg(src_idx, _) = st.vgprs[*src_lo];
+            st.bindings.push(Binding::Computed { expr: Expr::Shl(src_idx, shift), kind: DataKind::Qword });
+            for i in 0..2 { insert_into!(st.vgprs, *dst_lo + i as usize, Reg(st.bindings.len() - 1, i)); }
+        },
+        ("v_add_co_u32_e32", [VReg(ref dst), VCC, op1, op2]) => {
+            let op1_idx = operand_binding_dw(st, op1, "u32");
+            let op2_idx = operand_binding_dw(st, op2, "u32");
+            st.bindings.push(Binding::Computed { expr: Expr::Add(op1_idx, op2_idx), kind: DataKind::Dword });
+            println!("h");
+            insert_into!(st.vgprs, *dst, Reg(st.bindings.len() - 1, 0));
+        },
+        ("v_addc_co_u32_e32", [VReg(ref dst), VCC, VReg(ref op1), VReg(ref op2), VCC]) => {
+            /* Assuming this is a 64-bit addition — the previous operation in this case must have been "v_add_co_u32_e32",
+             * which used VCC as a carry flag. */
+            let Reg(lo_idx, _) = st.vgprs[*dst - 1];
+            let lo_binding = st.bindings[lo_idx];
+            if let Binding::Computed { expr: Expr::Add(op1_lo_idx, op2_lo_idx), kind: _ } = lo_binding {
+                let op1_lo_binding = st.bindings[op1_lo_idx];
+                let op1_adc = match (op1_lo_binding, st.vgprs[*op1], st.vgprs[*op2]) {
+                    (Binding::DwordElement { of, dword }, Reg(of_hi, dword_hi), _) if of == of_hi && dword + 1 == dword_hi => {
+                        st.bindings.push(Binding::QwordElement { of, dword });
+                        st.bindings.len() - 1
+                    },
+                    (Binding::DwordElement { of, dword }, _, Reg(of_hi, dword_hi)) if of == of_hi && dword + 1 == dword_hi => {
+                        st.bindings.push(Binding::QwordElement { of, dword });
+                        st.bindings.len() - 1
+                    },
+                    (_, Reg(of_hi, dword_hi), _) if op1_lo_idx == of_hi && dword_hi == 1 => op1_lo_idx,
+                    (_, _, Reg(of_hi, dword_hi)) if op1_lo_idx == of_hi && dword_hi == 1 => op1_lo_idx,
+                    other => panic!("64-bit addition heuristic failed to match the first operand ({:?})", other)
+                };
+                let op2_lo_binding = st.bindings[op2_lo_idx];
+                let op2_adc = match (op2_lo_binding, st.vgprs[*op1], st.vgprs[*op2]) {
+                    (Binding::DwordElement { of, dword }, Reg(of_hi, dword_hi), _) if of == of_hi && dword + 1 == dword_hi => {
+                        st.bindings.push(Binding::QwordElement { of, dword });
+                        st.bindings.len() - 1
+                    },
+                    (Binding::DwordElement { of, dword }, _, Reg(of_hi, dword_hi)) if of == of_hi && dword + 1 == dword_hi => {
+                        st.bindings.push(Binding::QwordElement { of, dword });
+                        st.bindings.len() - 1
+                    },
+                    (_, Reg(of_hi, dword_hi), _) if op2_lo_idx == of_hi && dword_hi == 1 => op2_lo_idx,
+                    (_, _, Reg(of_hi, dword_hi)) if op2_lo_idx == of_hi && dword_hi == 1 => op2_lo_idx,
+                    other => panic!("64-bit addition heuristic failed to match the second operand ({:?})", other)
+                };
+                st.bindings[lo_idx] = Binding::Computed { expr: Expr::Add(op1_adc, op2_adc), kind: DataKind::Qword };
+                for i in 0..2 { insert_into!(st.vgprs, *dst - 1 + i as usize, Reg(lo_idx, i)); }
+            }
+            else {
+                panic!("64-bit addition heuristic failed; v_addc_co_u32_e32 is _not_ used to add up the high part of a 64-bit int");
+            }
+        },
         unsupported => panic!("Operation not supported: {:?}", unsupported)
 //       ("v_ashrrev_i64", [VRegs(ref dst_lo, ref dst_hi), Lit(ref shift), VRegs(ref src_lo, ref src_hi)]) => {
 //           /* Most likely an i32 -> i64 conversion with optional multiplication/division
@@ -165,21 +225,6 @@ fn eval_valu_op(st: &mut ExecutionState, instr: &str, ops: &[Operand]) {
 //               };
 //               insert_into!(st.vgprs, *dst_lo, result.to_owned());
 //               insert_into!(st.vgprs, *dst_hi, result);
-//           }
-//       },
-//       ("v_add_co_u32_e32", [VReg(ref dst), VCC, op1, op2]) => {
-//           /* Check if this is actually 64-bit addition */
-//           if let Some("v_addc_co_u32_e32") = instr_iter.peek().map(|i| i.0.as_str()) {
-//               let ops_hi = &instr_iter.peek().unwrap().1;
-//               if ops_hi[0] == VReg(*dst + 1) && ops_hi[4] == VCC {
-//                   /* This is most likely 64-bit addition
-//                    * FIXME: check the operands of addc to make sure */
-//                   /* Assume that dst = sum of operands of the first addition (this works
-//                    * because we do not yet differentiate between higher and lower dwords */
-//                   let result = format!("({} + {})", operand!(st, op1), operand!(st, op2));
-//                   insert_into!(st.vgprs, *dst, result.to_owned());
-//                   insert_into!(st.vgprs, *dst + 1, result);
-//               }
 //           }
 //       },
     }
