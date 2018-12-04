@@ -28,6 +28,5 @@ fn main() {
 
     let mut state = exec_state::ExecutionState::from(kcode);
 
-    println!("Expression tree: {:#?}", eval::eval_pgm(&mut state, instructions));
-    println!("Bindings: {:#?}", state.bindings);
+    eval::eval_pgm(&mut state, instructions);
 }

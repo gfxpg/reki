@@ -86,23 +86,33 @@ fn eval_salu_op(st: &mut ExecutionState, instr: &str, ops: &[Operand]) {
             st.bindings.push(Binding::Computed { expr, kind: DataKind::Dword });
             insert_into!(st.sgprs, *dst, Reg(st.bindings.len() - 1, 0));
         },
-        ("s_and_b32", [SReg(ref dst), SReg(ref src), mask_op]) => {
-            let mask = operand_binding_dw(st, mask_op, "u16");
-            let expr = match st.sgprs[*src] {
-                Reg(src_idx, 0) => Expr::And(src_idx, mask),
-                other => panic!("Operand not supported: {:?} in s_and_b32", other)
-            };
+        ("s_add_i32", [SReg(ref dst), op1_raw, op2_raw]) => {
+            let op1 = operand_binding_dw(st, op1_raw, "i32");
+            let op2 = operand_binding_dw(st, op2_raw, "i32");
+            st.bindings.push(Binding::Computed { expr: Expr::Add(op1, op2), kind: DataKind::Dword });
+            insert_into!(st.sgprs, *dst, Reg(st.bindings.len() - 1, 0));
+        },
+        ("s_and_b32", [SReg(ref dst), op_raw, mask_raw]) => {
+            let op = operand_binding_dw(st, op_raw, "u32");
+            let mask = operand_binding_dw(st, mask_raw, "u32");
             let kind = match st.bindings[mask] {
                 Binding::U32(65535) => DataKind::U16, /* 0xffff is most likely a 32 -> 16 downcast */
                 _ => DataKind::Dword
             };
-            st.bindings.push(Binding::Computed { expr, kind });
+            st.bindings.push(Binding::Computed { expr: Expr::And(op, mask), kind });
             insert_into!(st.sgprs, *dst, Reg(st.bindings.len() - 1, 0));
         },
         ("s_cmp_lt_i32", [op1, op2]) =>
             match (operand_reg(st, op1, "i32"), operand_reg(st, op2, "i32")) {
                 (Reg(op1_idx, 0), Reg(op2_idx, 0)) => {
                     st.scc = Some(Condition::Lt(op1_idx, op2_idx))
+                },
+                other => panic!("Unrecognized operands: {:?}", other)
+            },
+        ("s_cmp_eq_u32", [op1, op2]) =>
+            match (operand_reg(st, op1, "u32"), operand_reg(st, op2, "u32")) {
+                (Reg(op1_idx, 0), Reg(op2_idx, 0)) => {
+                    st.scc = Some(Condition::Eql(op1_idx, op2_idx))
                 },
                 other => panic!("Unrecognized operands: {:?}", other)
             },
@@ -169,7 +179,6 @@ fn eval_valu_op(st: &mut ExecutionState, instr: &str, ops: &[Operand]) {
             let op1_idx = operand_binding_dw(st, op1, "u32");
             let op2_idx = operand_binding_dw(st, op2, "u32");
             st.bindings.push(Binding::Computed { expr: Expr::Add(op1_idx, op2_idx), kind: DataKind::Dword });
-            println!("h");
             insert_into!(st.vgprs, *dst, Reg(st.bindings.len() - 1, 0));
         },
         ("v_addc_co_u32_e32", [VReg(ref dst), VCC, VReg(ref op1), VReg(ref op2), VCC]) => {
@@ -213,6 +222,16 @@ fn eval_valu_op(st: &mut ExecutionState, instr: &str, ops: &[Operand]) {
                 panic!("64-bit addition heuristic failed; v_addc_co_u32_e32 is _not_ used to add up the high part of a 64-bit int");
             }
         },
+        ("v_addc_co_u32_e32", [_, VCC, Lit(0), _, VCC]) | ("v_addc_co_u32_e32", [_, VCC, _, Lit(0), VCC]) => (),
+        ("v_mac_f32_e32", [VReg(ref dst), op1, op2]) => {
+            let Reg(dst_idx, _) = st.vgprs[*dst];
+            let op1_idx = operand_binding_dw(st, op1, "f32");
+            let op2_idx = operand_binding_dw(st, op2, "f32");
+            st.bindings.push(Binding::Computed { expr: Expr::Mul(op1_idx, op2_idx), kind: DataKind::Dword });
+            let mul_idx = st.bindings.len() - 1;
+            st.bindings.push(Binding::Computed { expr: Expr::Add(dst_idx, mul_idx), kind: DataKind::Dword });
+            insert_into!(st.vgprs, *dst, Reg(st.bindings.len() - 1, 0));
+        },
         unsupported => panic!("Operation not supported: {:?}", unsupported)
 //       ("v_ashrrev_i64", [VRegs(ref dst_lo, ref dst_hi), Lit(ref shift), VRegs(ref src_lo, ref src_hi)]) => {
 //           /* Most likely an i32 -> i64 conversion with optional multiplication/division
@@ -243,11 +262,29 @@ pub fn eval_pgm(st: &mut ExecutionState, instrs: Vec<Instruction>) -> FlatProgra
         println!("{:?}\n\n~~~~~~~~~ {} {} {:?}", st, instr_idx + 1, instr, ops);
 
         match instr.as_str() {
-            "s_waitcnt" => (),
+            "s_waitcnt" | "s_endpgm" => (),
             "s_cbranch_scc1" => match ops.as_slice() {
                 [Lit(ref offset)] => pgm.push((instr_idx + 1, Statement::JumpIf {
                     cond: st.scc.unwrap().to_owned(), instr_offset: *offset as i16
                 })),
+                _ => ()
+            },
+            "s_cbranch_scc0" => match ops.as_slice() {
+                [Lit(ref offset)] => pgm.push((instr_idx + 1, Statement::JumpUnless {
+                    cond: st.scc.unwrap().to_owned(), instr_offset: *offset as i16
+                })),
+                _ => ()
+            },
+            "s_branch" => match ops.as_slice() {
+                [Lit(ref offset)] => pgm.push((instr_idx + 1, Statement::Jump { instr_offset: *offset as i16 })),
+                _ => ()
+            },
+            "global_store_dword" => match ops.as_slice() {
+                [VRegs(dst_lo, dst_hi), VReg(src), _] if st.vgprs[*dst_lo].0 == st.vgprs[*dst_hi].0 && st.vgprs[*dst_lo].1 == 0 && st.vgprs[*dst_hi].1 == 1 => {
+                    let Reg(binding_dst, _) = st.vgprs[*dst_lo];
+                    let Reg(binding_src, _) = st.vgprs[*src];
+                    pgm.push((instr_idx + 1, Statement::Store { addr: binding_dst, data: binding_src, kind: DataKind::Dword }))
+                },
                 _ => ()
             },
             instr if instr.starts_with("s_load") =>
