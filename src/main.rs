@@ -11,6 +11,7 @@ mod assembly;
 mod eval;
 mod expr;
 mod exec_state;
+mod control_flow;
 
 use std::path::PathBuf;
 
@@ -22,9 +23,11 @@ fn main() {
     }
     let hsaco = elf::File::open_path(&PathBuf::from(&args[1])).unwrap();
     let (kcode, kernel_args, instructions) = assembly::disassemble(hsaco).unwrap();
+    let cf_map = control_flow::build_map(&instructions);
 
     println!("{:#?}", kcode);
     println!("Args: {:#?}", kernel_args);
+    println!("Control flow map: {:?}", cf_map);
 
     let mut state = exec_state::ExecutionState::from(kcode);
 
