@@ -5,6 +5,7 @@ extern crate llvm_sys;
 extern crate libc;
 extern crate elf;
 extern crate byteorder;
+extern crate itertools;
 
 mod kernel_meta;
 mod assembly;
@@ -31,5 +32,6 @@ fn main() {
 
     let mut state = exec_state::ExecutionState::from(kcode);
 
-    eval::eval_pgm(&mut state, instructions);
+    println!("instrs: {:?}", instructions.len());
+    eval::eval_pgm(&mut state, instructions.as_slice(), &cf_map);
 }

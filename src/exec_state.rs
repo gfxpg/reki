@@ -1,6 +1,7 @@
 use kernel_meta::{KernelCode, VGPRWorkItemId};
 use expr::{Binding, Reg, Condition};
 
+#[derive(Clone)]
 pub struct ExecutionState {
     pub sgprs: Vec<Reg>,
     pub vgprs: Vec<Reg>,

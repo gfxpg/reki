@@ -1,4 +1,7 @@
+use itertools::Itertools;
+
 use exec_state::ExecutionState;
+use control_flow::ControlFlowMap;
 use expr::{Reg, Expr, Statement, Condition, Binding, BindingIdx, DataKind};
 
 pub type FlatProgram = Vec<(usize, Statement)>;
@@ -253,32 +256,36 @@ fn eval_valu_op(st: &mut ExecutionState, instr: &str, ops: &[Operand]) {
     }
 }
 
-pub fn eval_pgm(st: &mut ExecutionState, instrs: Vec<Instruction>) -> FlatProgram {
-    let mut instr_iter = instrs.iter().enumerate().peekable();
+type InstructionIter<'a> = std::iter::Enumerate<std::slice::Iter<'a, Instruction>>;
 
+fn eval_iter(st: &mut ExecutionState, mut instr_iter: InstructionIter, instr_count: usize, cf_map: &ControlFlowMap) -> FlatProgram {
     let mut pgm: FlatProgram = Vec::new();
 
     while let Some((instr_idx, (instr, ops))) = instr_iter.next() {
         println!("{:?}\n\n~~~~~~~~~ {} {} {:?}", st, instr_idx + 1, instr, ops);
 
+        use control_flow::ControlFlowNode::*;
+        match cf_map.get(&instr_idx) {
+            Some(&Uncond(dst)) => {
+                if dst < instr_idx {
+                    panic!("Unconditional backward jump from {} to {}", instr_idx, dst);
+                }
+                let _ = instr_iter.nth(dst - instr_idx - 2); // skip the instructions we've jumped over
+                continue;
+            },
+            Some(&ForkSCCSet(dst)) => {
+                println!("If SCC = 1 then goto {}", dst);
+                continue;
+            },
+            Some(&ForkSCCUnset(dst)) => {
+                println!("If SCC = 0 then goto {}", dst);
+                continue;
+            },
+            None => ()
+        }
+
         match instr.as_str() {
             "s_waitcnt" | "s_endpgm" => (),
-            "s_cbranch_scc1" => match ops.as_slice() {
-                [Lit(ref offset)] => pgm.push((instr_idx + 1, Statement::JumpIf {
-                    cond: st.scc.unwrap().to_owned(), instr_offset: *offset as i16
-                })),
-                _ => ()
-            },
-            "s_cbranch_scc0" => match ops.as_slice() {
-                [Lit(ref offset)] => pgm.push((instr_idx + 1, Statement::JumpUnless {
-                    cond: st.scc.unwrap().to_owned(), instr_offset: *offset as i16
-                })),
-                _ => ()
-            },
-            "s_branch" => match ops.as_slice() {
-                [Lit(ref offset)] => pgm.push((instr_idx + 1, Statement::Jump { instr_offset: *offset as i16 })),
-                _ => ()
-            },
             "global_store_dword" => match ops.as_slice() {
                 [VRegs(dst_lo, dst_hi), VReg(src), _] if st.vgprs[*dst_lo].0 == st.vgprs[*dst_hi].0 && st.vgprs[*dst_lo].1 == 0 && st.vgprs[*dst_hi].1 == 1 => {
                     let Reg(binding_dst, _) = st.vgprs[*dst_lo];
@@ -302,4 +309,8 @@ pub fn eval_pgm(st: &mut ExecutionState, instrs: Vec<Instruction>) -> FlatProgra
     }
 
     pgm
+}
+
+pub fn eval_pgm(st: &mut ExecutionState, instrs: &[Instruction], cf_map: &ControlFlowMap) -> FlatProgram {
+    eval_iter(st, instrs.iter().enumerate(), instrs.len(), cf_map)
 }
