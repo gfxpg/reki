@@ -264,21 +264,46 @@ fn eval_iter(st: &mut ExecutionState, mut instr_iter: InstructionIter, instr_cou
     while let Some((instr_idx, (instr, ops))) = instr_iter.next() {
         println!("{:?}\n\n~~~~~~~~~ {} {} {:?}", st, instr_idx + 1, instr, ops);
 
-        use control_flow::ControlFlowNode::*;
-        match cf_map.get(&instr_idx) {
-            Some(&Uncond(dst)) => {
+        if let Some(index) = cf_map.label_at_instruction(instr_idx) {
+            pgm.push((instr_idx + 1, Statement::Label { index }));
+        }
+
+        use control_flow::BranchKind;
+        match cf_map.branch_at_instruction(instr_idx) {
+            Some((BranchKind::Uncond, _, dst)) => {
                 if dst < instr_idx {
+                    /* I'm not sure what a real-world use case for this would be and whether we
+                     * need to recompute the state and diff it against the current one to bind
+                     * variables */
                     panic!("Unconditional backward jump from {} to {}", instr_idx, dst);
                 }
-                let _ = instr_iter.nth(dst - instr_idx - 2); // skip the instructions we've jumped over
+                /* Simply skip the instructions we're jumping over, no need to insert a goto */
+                let _ = instr_iter.nth(dst - instr_idx - 2);
                 continue;
             },
-            Some(&ForkSCCSet(dst)) => {
-                println!("If SCC = 1 then goto {}", dst);
-                continue;
+            /* forward conditional branch */
+            Some((ref kind, label_idx, dst)) if dst > instr_idx => {
+                let jump = match kind {
+                    BranchKind::SCCSet => Statement::JumpIf { cond: st.scc.unwrap(), label_idx },
+                    BranchKind::SCCUnset => Statement::JumpUnless { cond: st.scc.unwrap(), label_idx },
+                    _ => panic!("Unhandled branch kind: {:?}", kind)
+                };
+                pgm.push((instr_idx + 1, jump));
+
+                let mut st_branch = st.clone();
+                eval_iter(&mut st_branch, instr_iter.clone().dropping_back(instr_count - dst), instr_count, cf_map);
+                
+                println!("State taken: {:#?}, not taken: {:#?}", st_branch, st);
+                break;
             },
-            Some(&ForkSCCUnset(dst)) => {
-                println!("If SCC = 0 then goto {}", dst);
+            /* backward conditional branch */
+            Some((ref kind, label_idx, _)) => {
+                let jump = match kind {
+                    BranchKind::SCCSet => Statement::JumpIf { cond: st.scc.unwrap(), label_idx },
+                    BranchKind::SCCUnset => Statement::JumpUnless { cond: st.scc.unwrap(), label_idx },
+                    _ => panic!("Unhandled branch kind: {:?}", kind)
+                };
+                pgm.push((instr_idx + 1, jump));
                 continue;
             },
             None => ()

@@ -1,35 +1,55 @@
 use assembly::{Operand, Instruction};
 
-pub type ControlFlowMap = std::collections::HashMap<usize, ControlFlowNode>;
-
-#[derive(Debug)]
-pub enum ControlFlowNode {
-    ForkSCCSet(usize),
-    ForkSCCUnset(usize),
-    Uncond(usize)
+#[derive(Debug, Copy, Clone)]
+pub enum BranchKind {
+    SCCSet, SCCUnset, Uncond
 }
 
-pub fn build_map(instrs: &Vec<Instruction>) -> ControlFlowMap {
-    use self::ControlFlowNode::*;
+type LabelIdx = usize;
+type InstructionIdx = usize;
 
-    let mut map = ControlFlowMap::new();
+#[derive(Debug)]
+pub struct ControlFlowMap {
+    jumps: Vec<(InstructionIdx, BranchKind, LabelIdx)>,
+    labels: Vec<usize>
+}
+
+impl ControlFlowMap {
+    pub fn label_at_instruction(&self, instruction_idx: usize) -> Option<usize> {
+        self.labels.iter().position(|&idx| idx == instruction_idx)
+    }
+
+    pub fn branch_at_instruction(&self, instruction_idx: usize) -> Option<(BranchKind, LabelIdx, InstructionIdx)> {
+        self.jumps.iter()
+            .find(|&(idx, _, _)| *idx == instruction_idx)
+            .map(|&(_, kind, label_idx)| (kind, label_idx, self.labels[label_idx]))
+    }
+}
+
+
+pub fn build_map(instrs: &Vec<Instruction>) -> ControlFlowMap {
+    let mut jumps: Vec<(InstructionIdx, BranchKind, LabelIdx)> = Vec::new();
+    let mut labels: Vec<usize> = Vec::new();
 
     for (idx, (instr, ops)) in instrs.iter().enumerate() {
         match instr.as_str() {
             "s_branch" => {
-                map.insert(idx, Uncond(branch_destination(idx, ops.as_slice())));
+                labels.push(branch_destination(idx, ops));
+                jumps.push((idx, BranchKind::Uncond, labels.len() - 1));
             },
             "s_cbranch_scc1" => {
-                map.insert(idx, ForkSCCSet(branch_destination(idx, ops.as_slice())));
+                labels.push(branch_destination(idx, ops));
+                jumps.push((idx, BranchKind::SCCSet, labels.len() - 1));
             },
             "s_cbranch_scc0" => {
-                map.insert(idx, ForkSCCUnset(branch_destination(idx, ops.as_slice())));
+                labels.push(branch_destination(idx, ops));
+                jumps.push((idx, BranchKind::SCCUnset, labels.len() - 1));
             },
             _ => ()
         }
     }
 
-    map
+    ControlFlowMap { jumps, labels }
 }
 
 fn branch_destination(instr_idx: usize, branch_ops: &[Operand]) -> usize {

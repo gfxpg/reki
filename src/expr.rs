@@ -49,10 +49,10 @@ pub enum Expr {
 
 #[derive(Debug)]
 pub enum Statement {
-    JumpIf { cond: Condition, instr_offset: i16 },
-    JumpUnless { cond: Condition, instr_offset: i16 },
-    Jump { instr_offset: i16 },
-    Store { addr: BindingIdx, data: BindingIdx, kind: DataKind }
+    JumpIf { cond: Condition, label_idx: usize },
+    JumpUnless { cond: Condition, label_idx: usize },
+    Store { addr: BindingIdx, data: BindingIdx, kind: DataKind },
+    Label { index: usize }
 }
 
 #[derive(Debug, Copy, Clone)]
