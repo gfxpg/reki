@@ -1,7 +1,7 @@
 pub type BindingIdx = usize;
 pub type DwordIdx = u8;
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq)]
 pub struct Reg(pub BindingIdx, pub DwordIdx);
 
 #[derive(Debug, Copy, Clone)]
@@ -44,7 +44,8 @@ pub enum Expr {
     Mul(BindingIdx, BindingIdx),
     Add(BindingIdx, BindingIdx),
     And(BindingIdx, BindingIdx),
-    Shl(BindingIdx, BindingIdx)
+    Shl(BindingIdx, BindingIdx),
+    AddHiLo { hi_op1: BindingIdx, hi_op2: BindingIdx, lo_op1: BindingIdx, lo_op2: BindingIdx }
 }
 
 #[derive(Debug)]

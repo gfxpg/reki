@@ -4,7 +4,7 @@ use exec_state::ExecutionState;
 use control_flow::ControlFlowMap;
 use expr::{Reg, Expr, Statement, Condition, Binding, BindingIdx, DataKind};
 
-pub type FlatProgram = Vec<(usize, Statement)>;
+type Program = Vec<(usize, Statement)>;
 
 macro_rules! insert_into {
     ($vec:expr, $index:expr, $contents:expr) => {
@@ -139,12 +139,18 @@ fn operand_reg(st: &mut ExecutionState, op: &Operand, typehint: &str) -> Reg {
 }
 
 fn operand_binding_dw(st: &mut ExecutionState, op: &Operand, typehint: &str) -> BindingIdx {
-    match operand_reg(st, op, typehint) {
-        Reg(op_idx, 0) => op_idx,
-        Reg(of, dword) => {
-            st.bindings.push(Binding::DwordElement { of, dword });
-            st.bindings.len() - 1
-        }
+    let Reg(of, dword) = operand_reg(st, op, typehint);
+
+    if let Binding::Deref { kind: DataKind::DQword, .. } = st.bindings[of] {
+        st.bindings.push(Binding::DwordElement { of, dword });
+        st.bindings.len() - 1
+    }
+    else if dword == 0 {
+        of
+    }
+    else {
+        st.bindings.push(Binding::DwordElement { of, dword });
+        st.bindings.len() - 1
     }
 }
 
@@ -183,49 +189,40 @@ fn eval_valu_op(st: &mut ExecutionState, instr: &str, ops: &[Operand]) {
             let op2_idx = operand_binding_dw(st, op2, "u32");
             st.bindings.push(Binding::Computed { expr: Expr::Add(op1_idx, op2_idx), kind: DataKind::Dword });
             insert_into!(st.vgprs, *dst, Reg(st.bindings.len() - 1, 0));
+            println!("Add({:?}, {:?}), state: {:#?}", op1_idx, op2_idx, st);
         },
-        ("v_addc_co_u32_e32", [VReg(ref dst), VCC, VReg(ref op1), VReg(ref op2), VCC]) => {
-            /* Assuming this is a 64-bit addition — the previous operation in this case must have been "v_add_co_u32_e32",
-             * which used VCC as a carry flag. */
+        ("v_addc_co_u32_e32", [_, VCC, Lit(0), _, VCC]) | ("v_addc_co_u32_e32", [_, VCC, _, Lit(0), VCC]) => (/* ¯\_(ツ)_/¯ */),
+        ("v_addc_co_u32_e32", [VReg(ref dst), VCC, op1, op2, VCC]) => {
+            /* We assume that this instruction is used for 64-bit addition — the previous operation in
+             * this case must have been "v_add_co_u32_e32", which used VCC as a carry flag. */
             let Reg(lo_idx, _) = st.vgprs[*dst - 1];
             let lo_binding = st.bindings[lo_idx];
-            if let Binding::Computed { expr: Expr::Add(op1_lo_idx, op2_lo_idx), kind: _ } = lo_binding {
-                let op1_lo_binding = st.bindings[op1_lo_idx];
-                let op1_adc = match (op1_lo_binding, st.vgprs[*op1], st.vgprs[*op2]) {
-                    (Binding::DwordElement { of, dword }, Reg(of_hi, dword_hi), _) if of == of_hi && dword + 1 == dword_hi => {
-                        st.bindings.push(Binding::QwordElement { of, dword });
-                        st.bindings.len() - 1
-                    },
-                    (Binding::DwordElement { of, dword }, _, Reg(of_hi, dword_hi)) if of == of_hi && dword + 1 == dword_hi => {
-                        st.bindings.push(Binding::QwordElement { of, dword });
-                        st.bindings.len() - 1
-                    },
-                    (_, Reg(of_hi, dword_hi), _) if op1_lo_idx == of_hi && dword_hi == 1 => op1_lo_idx,
-                    (_, _, Reg(of_hi, dword_hi)) if op1_lo_idx == of_hi && dword_hi == 1 => op1_lo_idx,
-                    other => panic!("64-bit addition heuristic failed to match the first operand ({:?})", other)
+            
+            let (op1_reg, op2_reg) = match (op1, op2) {
+                (VReg(op1_idx), VReg(op2_idx)) => (st.vgprs[*op1_idx], st.vgprs[*op2_idx]),
+                _ => panic!("Unexpected v_addc_co_u32_e32 operands: {:?}", ops)
+            };
+
+            if let Binding::Computed { expr: Expr::Add(lo_op1, lo_op2), kind: _ } = lo_binding {
+                let expr = match addc_qword_matching_operands(&mut st.bindings, op1_reg, op2_reg, lo_op1, lo_op2) {
+                    Some((op1_adc, op2_adc)) => Expr::Add(op1_adc, op2_adc),
+                    _ => {
+                        /* If we can't figure out qword operands from the previous v_add instruction,
+                         * we'll have to have four operands */
+                        Expr::AddHiLo {
+                            lo_op1, lo_op2,
+                            hi_op1: operand_binding_dw(st, op1, "u32"),
+                            hi_op2: operand_binding_dw(st, op2, "u32")
+                        }
+                    }
                 };
-                let op2_lo_binding = st.bindings[op2_lo_idx];
-                let op2_adc = match (op2_lo_binding, st.vgprs[*op1], st.vgprs[*op2]) {
-                    (Binding::DwordElement { of, dword }, Reg(of_hi, dword_hi), _) if of == of_hi && dword + 1 == dword_hi => {
-                        st.bindings.push(Binding::QwordElement { of, dword });
-                        st.bindings.len() - 1
-                    },
-                    (Binding::DwordElement { of, dword }, _, Reg(of_hi, dword_hi)) if of == of_hi && dword + 1 == dword_hi => {
-                        st.bindings.push(Binding::QwordElement { of, dword });
-                        st.bindings.len() - 1
-                    },
-                    (_, Reg(of_hi, dword_hi), _) if op2_lo_idx == of_hi && dword_hi == 1 => op2_lo_idx,
-                    (_, _, Reg(of_hi, dword_hi)) if op2_lo_idx == of_hi && dword_hi == 1 => op2_lo_idx,
-                    other => panic!("64-bit addition heuristic failed to match the second operand ({:?})", other)
-                };
-                st.bindings[lo_idx] = Binding::Computed { expr: Expr::Add(op1_adc, op2_adc), kind: DataKind::Qword };
+                st.bindings[lo_idx] = Binding::Computed { expr, kind: DataKind::Qword };
                 for i in 0..2 { insert_into!(st.vgprs, *dst - 1 + i as usize, Reg(lo_idx, i)); }
             }
             else {
                 panic!("64-bit addition heuristic failed; v_addc_co_u32_e32 is _not_ used to add up the high part of a 64-bit int");
             }
         },
-        ("v_addc_co_u32_e32", [_, VCC, Lit(0), _, VCC]) | ("v_addc_co_u32_e32", [_, VCC, _, Lit(0), VCC]) => (),
         ("v_mac_f32_e32", [VReg(ref dst), op1, op2]) => {
             let Reg(dst_idx, _) = st.vgprs[*dst];
             let op1_idx = operand_binding_dw(st, op1, "f32");
@@ -256,10 +253,41 @@ fn eval_valu_op(st: &mut ExecutionState, instr: &str, ops: &[Operand]) {
     }
 }
 
+fn addc_qword_matching_operands(bindings: &mut Vec<Binding>, op1: Reg, op2: Reg, lo_op1: BindingIdx, lo_op2: BindingIdx) -> Option<(BindingIdx, BindingIdx)> {
+    let op1_adc = match (bindings[lo_op1], op1, op2) {
+        (Binding::DwordElement { of, dword }, Reg(of_hi, dword_hi), _) if of == of_hi && dword + 1 == dword_hi => {
+            bindings.push(Binding::QwordElement { of, dword });
+            bindings.len() - 1
+        },
+        (Binding::DwordElement { of, dword }, _, Reg(of_hi, dword_hi)) if of == of_hi && dword + 1 == dword_hi => {
+            bindings.push(Binding::QwordElement { of, dword });
+            bindings.len() - 1
+        },
+        (_, Reg(of_hi, dword_hi), _) if lo_op1 == of_hi && dword_hi == 1 => lo_op1,
+        (_, _, Reg(of_hi, dword_hi)) if lo_op1 == of_hi && dword_hi == 1 => lo_op1,
+        _ => return None
+    };
+    let op2_adc = match (bindings[lo_op2], op1, op2) {
+        (Binding::DwordElement { of, dword }, Reg(of_hi, dword_hi), _) if of == of_hi && dword + 1 == dword_hi => {
+            bindings.push(Binding::QwordElement { of, dword });
+            bindings.len() - 1
+        },
+        (Binding::DwordElement { of, dword }, _, Reg(of_hi, dword_hi)) if of == of_hi && dword + 1 == dword_hi => {
+            bindings.push(Binding::QwordElement { of, dword });
+            bindings.len() - 1
+        },
+        (_, Reg(of_hi, dword_hi), _) if lo_op2 == of_hi && dword_hi == 1 => lo_op2,
+        (_, _, Reg(of_hi, dword_hi)) if lo_op2 == of_hi && dword_hi == 1 => lo_op2,
+        _ => return None
+    };
+    Some((op1_adc, op2_adc))
+}
+
+
 type InstructionIter<'a> = std::iter::Enumerate<std::slice::Iter<'a, Instruction>>;
 
-fn eval_iter(st: &mut ExecutionState, mut instr_iter: InstructionIter, instr_count: usize, cf_map: &ControlFlowMap) -> FlatProgram {
-    let mut pgm: FlatProgram = Vec::new();
+fn eval_iter(st: &mut ExecutionState, mut instr_iter: InstructionIter, instr_count: usize, cf_map: &ControlFlowMap) -> Program {
+    let mut pgm = Program::new();
 
     while let Some((instr_idx, (instr, ops))) = instr_iter.next() {
         println!("{:?}\n\n~~~~~~~~~ {} {} {:?}", st, instr_idx + 1, instr, ops);
@@ -281,29 +309,46 @@ fn eval_iter(st: &mut ExecutionState, mut instr_iter: InstructionIter, instr_cou
                 let _ = instr_iter.nth(dst - instr_idx - 2);
                 continue;
             },
-            /* forward conditional branch */
             Some((ref kind, label_idx, dst)) if dst > instr_idx => {
-                let jump = match kind {
+                /* A forward conditional branch wraps a block of instructions:
+                 *
+                 * branch_if_cond label0
+                 * ...instructions
+                 * label0:
+                 * ...rest of the program
+                 *
+                 * We clone the execution state and pass it through the block, then diff it
+                 * against the state before the jump. Registers with different contents are
+                 * then changed to point to the same _variable_, which is reassigned within
+                 * the block. */
+
+                let mut st_block = st.clone();
+                let block_instr_iter = instr_iter.clone().dropping_back(instr_count - dst);
+                let mut block = eval_iter(&mut st_block, block_instr_iter, instr_count, cf_map);
+
+                /* TODO: extract variables by comparing st_block.[s|v]regs against st.[s|v]regs */
+
+                st.bindings = st_block.bindings;
+
+                pgm.push((instr_idx + 1, match kind {
                     BranchKind::SCCSet => Statement::JumpIf { cond: st.scc.unwrap(), label_idx },
                     BranchKind::SCCUnset => Statement::JumpUnless { cond: st.scc.unwrap(), label_idx },
                     _ => panic!("Unhandled branch kind: {:?}", kind)
-                };
-                pgm.push((instr_idx + 1, jump));
+                }));
+                pgm.append(&mut block);
 
-                let mut st_branch = st.clone();
-                eval_iter(&mut st_branch, instr_iter.clone().dropping_back(instr_count - dst), instr_count, cf_map);
-                
-                println!("State taken: {:#?}, not taken: {:#?}", st_branch, st);
-                break;
+                /* Skip the block, we've already evaluated it */
+                let _ = instr_iter.nth(dst - instr_idx - 2);
+                continue;
             },
             /* backward conditional branch */
             Some((ref kind, label_idx, _)) => {
-                let jump = match kind {
+                pgm.push((instr_idx + 1, match kind {
                     BranchKind::SCCSet => Statement::JumpIf { cond: st.scc.unwrap(), label_idx },
                     BranchKind::SCCUnset => Statement::JumpUnless { cond: st.scc.unwrap(), label_idx },
                     _ => panic!("Unhandled branch kind: {:?}", kind)
-                };
-                pgm.push((instr_idx + 1, jump));
+                }));
+
                 continue;
             },
             None => ()
@@ -330,12 +375,13 @@ fn eval_iter(st: &mut ExecutionState, mut instr_iter: InstructionIter, instr_cou
             unsupported => panic!("Operation not supported: {:?}", unsupported)
         }
 
+        println!("State: {:?}", st);
         println!("Program: {:?}", pgm);
     }
 
     pgm
 }
 
-pub fn eval_pgm(st: &mut ExecutionState, instrs: &[Instruction], cf_map: &ControlFlowMap) -> FlatProgram {
+pub fn eval_pgm(st: &mut ExecutionState, instrs: &[Instruction], cf_map: &ControlFlowMap) -> Program {
     eval_iter(st, instrs.iter().enumerate(), instrs.len(), cf_map)
 }
