@@ -9,10 +9,10 @@ extern crate itertools;
 
 mod kernel_meta;
 mod assembly;
-mod eval;
 mod expr;
 mod exec_state;
 mod control_flow;
+mod data_flow;
 
 use std::path::PathBuf;
 
@@ -24,6 +24,7 @@ fn main() {
     }
     let hsaco = elf::File::open_path(&PathBuf::from(&args[1])).unwrap();
     let (kcode, kernel_args, instructions) = assembly::disassemble(hsaco).unwrap();
+
     let cf_map = control_flow::build_map(&instructions);
 
     println!("{:#?}", kcode);
@@ -32,6 +33,7 @@ fn main() {
 
     let mut state = exec_state::ExecutionState::from(kcode);
 
-    println!("instrs: {:?}", instructions.len());
-    eval::eval_pgm(&mut state, instructions.as_slice(), &cf_map);
+    let program = data_flow::analyze(&mut state, instructions.as_slice(), &cf_map);
+
+    println!("Program: {:#?}", program);
 }
