@@ -10,6 +10,11 @@ pub enum DataKind {
 }
 
 #[derive(Debug, Copy, Clone)]
+pub enum Variable {
+    Dword, Qword, DQword, PartialQword, PartialDQword
+}
+
+#[derive(Debug, Copy, Clone)]
 pub enum Binding {
     U32(u32),
     I32(i32),
@@ -18,6 +23,7 @@ pub enum Binding {
     DwordElement { of: BindingIdx, dword: u8 },
     QwordElement { of: BindingIdx, dword: u8 },
     Cast { source: BindingIdx, kind: DataKind },
+    Variable { idx: usize },
 
     /* Built-ins (initial register state) */
     PrivateSegmentBuffer,
@@ -53,7 +59,11 @@ pub enum Statement {
     JumpIf { cond: Condition, label_idx: usize },
     JumpUnless { cond: Condition, label_idx: usize },
     Store { addr: BindingIdx, data: BindingIdx, kind: DataKind },
-    Label { index: usize }
+    Label { index: usize },
+    VarDecl { var_idx: usize },
+    DwordVarAssignment { var_idx: usize, binding_idx: BindingIdx, binding_dword: u8, var_dword: u8 },
+    QwordVarAssignment { var_idx: usize, binding_idx: BindingIdx, binding_dword: u8, var_dword: u8 },
+    DQwordVarAssignment { var_idx: usize, binding_idx: BindingIdx, binding_dword: u8, var_dword: u8 }
 }
 
 #[derive(Debug, Copy, Clone)]

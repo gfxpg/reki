@@ -1,11 +1,12 @@
 use kernel_meta::{KernelCode, VGPRWorkItemId};
-use expr::{Binding, Reg, Condition};
+use expr::{Binding, Variable, Reg, Condition};
 
 #[derive(Clone)]
 pub struct ExecutionState {
     pub sgprs: Vec<Reg>,
     pub vgprs: Vec<Reg>,
     pub bindings: Vec<Binding>,
+    pub variables: Vec<Variable>,
     pub vcc: Option<Condition>,
     pub scc: Option<Condition>
 }
@@ -14,13 +15,17 @@ use std::fmt;
 
 impl fmt::Debug for ExecutionState {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "Bindings:\n")?;
-        for (i, ref binding) in self.bindings.iter().enumerate() {
-            write!(f, "{:4} {:?}\n", i, binding)?;
-        }
-        write!(f, "SGPRS: {:?}\n", self.sgprs.iter().enumerate().collect::<Vec<(usize, &Reg)>>())?;
-        write!(f, "VGPRS: {:?}\n", self.vgprs.iter().enumerate().collect::<Vec<(usize, &Reg)>>())?;
-        write!(f, "SCC: {:?}, VCC: {:?}", self.scc, self.vcc)
+        writeln!(f, "Bindings:")?;
+        self.bindings.iter().enumerate()
+            .try_for_each(|(i, binding)| writeln!(f, "{:4} {:?}", i, binding))?;
+
+        writeln!(f, "Variables:")?;
+        self.variables.iter().enumerate()
+            .try_for_each(|(i, variable)| writeln!(f, "{:4} {:?}", i, variable))?;
+
+        writeln!(f, "SGPRS: {:?}", self.sgprs.iter().enumerate().collect::<Vec<(usize, &Reg)>>())?;
+        writeln!(f, "VGPRS: {:?}", self.vgprs.iter().enumerate().collect::<Vec<(usize, &Reg)>>())?;
+        writeln!(f, "SCC: {:?}, VCC: {:?}", self.scc, self.vcc)
     }
 }
 
@@ -105,6 +110,6 @@ impl From<KernelCode> for ExecutionState {
             }
         };
         
-        ExecutionState { sgprs, vgprs, bindings, scc: None, vcc: None }
+        ExecutionState { sgprs, vgprs, bindings, scc: None, vcc: None, variables: Vec::new() }
     }
 }
