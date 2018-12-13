@@ -1,7 +1,6 @@
-use data_flow::Program;
-use exec_state::ExecutionState;
-use expr::{Reg, Expr, Statement, Condition, Binding, BindingIdx, DataKind};
-use assembly::{Operand, Operand::*};
+use data_flow::{Program, exec_state::ExecState};
+use data_flow::types::{Reg, Expr, Statement, Condition, Binding, BindingIdx, DataKind};
+use asm::{Operand, Operand::*};
 
 macro_rules! insert_into {
     ($vec:expr, $index:expr, $contents:expr) => {
@@ -17,7 +16,7 @@ macro_rules! insert_into {
     }
 }
 
-pub fn eval_gcn_instruction(st: &mut ExecutionState, pgm: &mut Program, instr_idx: usize, instr: &str, ops: &[Operand]) {
+pub fn eval_gcn_instruction(st: &mut ExecState, pgm: &mut Program, instr_idx: usize, instr: &str, ops: &[Operand]) {
     match instr {
         "s_waitcnt" | "s_endpgm" => (),
         "global_store_dword" => match ops {
@@ -36,7 +35,7 @@ pub fn eval_gcn_instruction(st: &mut ExecutionState, pgm: &mut Program, instr_id
     }
 }
 
-fn eval_global_load(st: &mut ExecutionState, instr: &str, ops: &[Operand]) {
+fn eval_global_load(st: &mut ExecState, instr: &str, ops: &[Operand]) {
     let kind = match &instr[12..] {
         "ushort" => DataKind::U16,
         "dword" => DataKind::Dword,
@@ -57,7 +56,7 @@ fn eval_global_load(st: &mut ExecutionState, instr: &str, ops: &[Operand]) {
     }
 }
 
-fn eval_s_load(st: &mut ExecutionState, instr: &str, ops: &[Operand]) {
+fn eval_s_load(st: &mut ExecState, instr: &str, ops: &[Operand]) {
     let (ptr, offset) = match ops {
         [_, source, Lit(ref offset)] => (load_ptr_binding(st, source), offset),
         _ => panic!("Received invalid operands in eval_s_load")
@@ -80,7 +79,7 @@ fn eval_s_load(st: &mut ExecutionState, instr: &str, ops: &[Operand]) {
     }
 }
 
-fn eval_salu_op(st: &mut ExecutionState, instr: &str, ops: &[Operand]) {
+fn eval_salu_op(st: &mut ExecState, instr: &str, ops: &[Operand]) {
     match (instr, ops) {
         ("s_mul_i32", [SReg(ref dst), SReg(ref op1), SReg(ref op2)]) => {
             let expr = match (st.sgprs[*op1], st.sgprs[*op2]) {
@@ -124,7 +123,7 @@ fn eval_salu_op(st: &mut ExecutionState, instr: &str, ops: &[Operand]) {
     }
 }
 
-fn eval_valu_op(st: &mut ExecutionState, instr: &str, ops: &[Operand]) {
+fn eval_valu_op(st: &mut ExecState, instr: &str, ops: &[Operand]) {
     match (instr, ops) {
         ("v_mov_b32_e32", [VReg(ref dst), src]) => {
             let contents = operand_reg(st, src, "u32");
@@ -252,7 +251,7 @@ fn addc_qword_matching_operands(bindings: &mut Vec<Binding>, op1: Reg, op2: Reg,
     Some((op1_adc, op2_adc))
 }
 
-fn load_ptr_binding(st: &ExecutionState, source: &Operand) -> BindingIdx {
+fn load_ptr_binding(st: &ExecState, source: &Operand) -> BindingIdx {
     let (src_lo, src_hi) = match source {
         SRegs(ref src_lo, ref src_hi) => (st.sgprs[*src_lo], st.sgprs[*src_hi]),
         VRegs(ref src_lo, ref src_hi) => (st.vgprs[*src_lo], st.vgprs[*src_hi]),
@@ -264,7 +263,7 @@ fn load_ptr_binding(st: &ExecutionState, source: &Operand) -> BindingIdx {
     }
 }
 
-fn operand_reg(st: &mut ExecutionState, op: &Operand, typehint: &str) -> Reg {
+fn operand_reg(st: &mut ExecState, op: &Operand, typehint: &str) -> Reg {
     match op {
         SReg(ref i) => st.sgprs[*i],
         VReg(ref i) => st.vgprs[*i],
@@ -279,7 +278,7 @@ fn operand_reg(st: &mut ExecutionState, op: &Operand, typehint: &str) -> Reg {
     }
 }
 
-fn operand_binding_dw(st: &mut ExecutionState, op: &Operand, typehint: &str) -> BindingIdx {
+fn operand_binding_dw(st: &mut ExecState, op: &Operand, typehint: &str) -> BindingIdx {
     let Reg(of, dword) = operand_reg(st, op, typehint);
 
     if let Binding::Deref { kind: DataKind::DQword, .. } = st.bindings[of] {

@@ -7,10 +7,7 @@ extern crate elf;
 extern crate byteorder;
 extern crate itertools;
 
-mod kernel_meta;
-mod assembly;
-mod expr;
-mod exec_state;
+mod asm;
 mod control_flow;
 mod data_flow;
 
@@ -23,7 +20,7 @@ fn main() {
         return;
     }
     let hsaco = elf::File::open_path(&PathBuf::from(&args[1])).unwrap();
-    let (kcode, kernel_args, instructions) = assembly::disassemble(hsaco).unwrap();
+    let (kcode, kernel_args, instructions) = asm::disassemble(hsaco).unwrap();
 
     let cf_map = control_flow::build_map(&instructions);
 
@@ -31,8 +28,7 @@ fn main() {
     println!("Args: {:#?}", kernel_args);
     println!("Control flow map: {:?}", cf_map);
 
-    let mut state = exec_state::ExecutionState::from(kcode);
-
+    let mut state = data_flow::exec_state::ExecState::from(kcode);
     let program = data_flow::analyze(&mut state, instructions.as_slice(), &cf_map);
 
     println!("Program: {:#?}", program);

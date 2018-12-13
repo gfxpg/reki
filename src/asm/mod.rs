@@ -1,9 +1,11 @@
+pub mod kernel_meta;
+
 use std::io;
 use std::ffi::CString;
 use std::convert::TryFrom;
 use llvm_sys::disassembler::{LLVMCreateDisasmCPU, LLVMDisasmInstruction, LLVMDisasmDispose};
 
-use kernel_meta::{extract_kernel_args, KernelCode, KernelArg};
+use self::kernel_meta::{extract_kernel_args, KernelCode, KernelArg};
 
 pub type Instruction = (String, Vec<Operand>);
 

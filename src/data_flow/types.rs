@@ -1,5 +1,8 @@
 pub type BindingIdx = usize;
 pub type DwordIdx = u8;
+pub type AsmInstructionIdx = usize;
+
+pub type Program = Vec<(AsmInstructionIdx, Statement)>;
 
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub struct Reg(pub BindingIdx, pub DwordIdx);

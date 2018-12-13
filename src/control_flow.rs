@@ -1,4 +1,4 @@
-use assembly::{Operand, Instruction};
+use asm::{Instruction, Operand, Operand::*};
 
 #[derive(Debug, Copy, Clone)]
 pub enum BranchKind {
@@ -53,8 +53,6 @@ pub fn build_map(instrs: &Vec<Instruction>) -> ControlFlowMap {
 }
 
 fn branch_destination(instr_idx: usize, branch_ops: &[Operand]) -> usize {
-    use assembly::Operand::*;
-
     match branch_ops {
         [Lit(branch_fwd_idx)] if *branch_fwd_idx <= 32767 =>
             instr_idx + 1 + (*branch_fwd_idx as usize),

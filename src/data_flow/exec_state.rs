@@ -1,8 +1,8 @@
-use kernel_meta::{KernelCode, VGPRWorkItemId};
-use expr::{Binding, Variable, Reg, Condition};
+use asm::kernel_meta::{KernelCode, VGPRWorkItemId};
+use data_flow::types::{Binding, Variable, Reg, Condition};
 
 #[derive(Clone)]
-pub struct ExecutionState {
+pub struct ExecState {
     pub sgprs: Vec<Reg>,
     pub vgprs: Vec<Reg>,
     pub bindings: Vec<Binding>,
@@ -13,7 +13,7 @@ pub struct ExecutionState {
 
 use std::fmt;
 
-impl fmt::Debug for ExecutionState {
+impl fmt::Debug for ExecState {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         writeln!(f, "Bindings:")?;
         self.bindings.iter().enumerate()
@@ -41,7 +41,7 @@ macro_rules! bind_init_state {
     }
 }
 
-impl From<KernelCode> for ExecutionState {
+impl From<KernelCode> for ExecState {
     fn from(kcode: KernelCode) -> Self {
         let mut sgprs: Vec<Reg> = Vec::with_capacity(16);
         let mut bindings: Vec<Binding> = Vec::with_capacity(16);
@@ -110,6 +110,6 @@ impl From<KernelCode> for ExecutionState {
             }
         };
         
-        ExecutionState { sgprs, vgprs, bindings, scc: None, vcc: None, variables: Vec::new() }
+        ExecState { sgprs, vgprs, bindings, scc: None, vcc: None, variables: Vec::new() }
     }
 }

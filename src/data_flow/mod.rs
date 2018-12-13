@@ -1,21 +1,21 @@
-use itertools::Itertools;
-
-use exec_state::ExecutionState;
-use control_flow::ControlFlowMap;
-use expr::{Reg, Statement, Binding, Variable};
-use assembly::Instruction;
-
+pub mod exec_state;
+mod types;
 mod ops;
 
-type Program = Vec<(usize, Statement)>;
+use itertools::Itertools;
 
-pub fn analyze(st: &mut ExecutionState, instrs: &[Instruction], cf_map: &ControlFlowMap) -> Program {
+use asm::Instruction;
+use control_flow::ControlFlowMap;
+use self::exec_state::ExecState;
+use self::types::{Program, Reg, Statement, Binding, Variable};
+
+pub fn analyze(st: &mut ExecState, instrs: &[Instruction], cf_map: &ControlFlowMap) -> Program {
     eval_instructions_within_block(st, instrs.iter().enumerate(), instrs.len(), cf_map)
 }
 
 type InstructionIter<'a> = std::iter::Enumerate<std::slice::Iter<'a, Instruction>>;
 
-fn eval_instructions_within_block(st: &mut ExecutionState, mut instr_iter: InstructionIter, instr_count: usize, cf_map: &ControlFlowMap) -> Program {
+fn eval_instructions_within_block(st: &mut ExecState, mut instr_iter: InstructionIter, instr_count: usize, cf_map: &ControlFlowMap) -> Program {
     let mut pgm = Program::new();
 
     while let Some((instr_idx, (instr, ops))) = instr_iter.next() {
@@ -96,7 +96,7 @@ fn eval_instructions_within_block(st: &mut ExecutionState, mut instr_iter: Instr
     pgm
 }
 
-fn block_variables(st_executed: &mut ExecutionState, st_skipped: &ExecutionState) -> (Vec<Statement>, Vec<Statement>, Vec<Statement>) {
+fn block_variables(st_executed: &mut ExecState, st_skipped: &ExecState) -> (Vec<Statement>, Vec<Statement>, Vec<Statement>) {
     let mut declarations: Vec<Statement> = Vec::new();
 
     let last_var_idx = if st_executed.variables.len() == 0 { 0 } else { st_executed.variables.len() - 1 };
