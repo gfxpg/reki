@@ -27,8 +27,11 @@ pub enum Binding {
     QwordElement { of: BindingIdx, dword: u8 },
     Cast { source: BindingIdx, kind: DataKind },
     Variable { idx: usize },
+    InitState(BuiltIn)
+}
 
-    /* Built-ins (initial register state) */
+#[derive(Debug, Copy, Clone)]
+pub enum BuiltIn {
     PrivateSegmentBuffer,
     PtrDispatchPacket,
     PtrQueue,

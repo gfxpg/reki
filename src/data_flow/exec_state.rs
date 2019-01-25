@@ -1,5 +1,5 @@
 use asm::kernel_meta::{KernelCode, VGPRWorkItemId};
-use data_flow::types::{Binding, Variable, Reg, Condition};
+use data_flow::types::{Binding, BuiltIn, Variable, Reg, Condition};
 
 #[derive(Clone)]
 pub struct ExecState {
@@ -31,12 +31,12 @@ impl fmt::Debug for ExecState {
 
 macro_rules! bind_init_state {
     (qword $val:expr, $bindings:expr, $regfile:expr) => {
-        $bindings.push($val);
+        $bindings.push(Binding::InitState($val));
         $regfile.push(Reg($bindings.len() - 1, 0));
         $regfile.push(Reg($bindings.len() - 1, 1));
     };
     (dword $val:expr, $bindings:expr, $regfile:expr) => {
-        $bindings.push($val);
+        $bindings.push(Binding::InitState($val));
         $regfile.push(Reg($bindings.len() - 1, 0));
     }
 }
@@ -48,64 +48,64 @@ impl From<KernelCode> for ExecState {
 
         /* https://llvm.org/docs/AMDGPUUsage.html#amdgpu-amdhsa-sgpr-register-set-up-order-table */
         if kcode.code_props.enable_sgpr_private_segment_buffer {
-            bindings.push(Binding::PrivateSegmentBuffer);
+            bindings.push(Binding::InitState(BuiltIn::PrivateSegmentBuffer));
             for i in 0..4 { sgprs.push(Reg(bindings.len() - 1, i)); }
         }
         if kcode.code_props.enable_sgpr_dispatch_ptr {
-            bind_init_state!(qword Binding::PtrDispatchPacket, bindings, sgprs);
+            bind_init_state!(qword BuiltIn::PtrDispatchPacket, bindings, sgprs);
         }
         if kcode.code_props.enable_sgpr_queue_ptr {
-            bind_init_state!(qword Binding::PtrQueue, bindings, sgprs);
+            bind_init_state!(qword BuiltIn::PtrQueue, bindings, sgprs);
         }
         if kcode.code_props.enable_sgpr_kernarg_segment_ptr {
-            bind_init_state!(qword Binding::PtrKernarg, bindings, sgprs);
+            bind_init_state!(qword BuiltIn::PtrKernarg, bindings, sgprs);
         }
         if kcode.code_props.enable_sgpr_dispatch_id {
-            bind_init_state!(qword Binding::DispatchId, bindings, sgprs);
+            bind_init_state!(qword BuiltIn::DispatchId, bindings, sgprs);
         }
         if kcode.code_props.enable_sgpr_flat_scratch_init {
-            bind_init_state!(qword Binding::FlatScratchInit, bindings, sgprs);
+            bind_init_state!(qword BuiltIn::FlatScratchInit, bindings, sgprs);
         }
         if kcode.code_props.enable_sgpr_grid_workgroup_count_x {
-            bind_init_state!(dword Binding::WorkgroupCountX, bindings, sgprs);
+            bind_init_state!(dword BuiltIn::WorkgroupCountX, bindings, sgprs);
         }
         if kcode.code_props.enable_sgpr_grid_workgroup_count_y && sgprs.len() < 16 {
-            bind_init_state!(dword Binding::WorkgroupCountY, bindings, sgprs);
+            bind_init_state!(dword BuiltIn::WorkgroupCountY, bindings, sgprs);
         }
         if kcode.code_props.enable_sgpr_grid_workgroup_count_z && sgprs.len() < 16 {
-            bind_init_state!(dword Binding::WorkgroupCountZ, bindings, sgprs);
+            bind_init_state!(dword BuiltIn::WorkgroupCountZ, bindings, sgprs);
         }
         if kcode.pgm_props.enable_sgpr_workgroup_id_x {
-            bind_init_state!(dword Binding::WorkgroupIdX, bindings, sgprs);
+            bind_init_state!(dword BuiltIn::WorkgroupIdX, bindings, sgprs);
         }
         if kcode.pgm_props.enable_sgpr_workgroup_id_y {
-            bind_init_state!(dword Binding::WorkgroupIdY, bindings, sgprs);
+            bind_init_state!(dword BuiltIn::WorkgroupIdY, bindings, sgprs);
         }
         if kcode.pgm_props.enable_sgpr_workgroup_id_z {
-            bind_init_state!(dword Binding::WorkgroupIdZ, bindings, sgprs);
+            bind_init_state!(dword BuiltIn::WorkgroupIdZ, bindings, sgprs);
         }
         if kcode.pgm_props.enable_sgpr_workgroup_info {
-            bind_init_state!(dword Binding::WorkgroupInfo, bindings, sgprs);
+            bind_init_state!(dword BuiltIn::WorkgroupInfo, bindings, sgprs);
         }
         if kcode.pgm_props.enable_sgpr_private_segment_wavefront_offset {
-            bind_init_state!(dword Binding::PrivateSegmentWavefrontOffset, bindings, sgprs);
+            bind_init_state!(dword BuiltIn::PrivateSegmentWavefrontOffset, bindings, sgprs);
         }
 
         /* https://llvm.org/docs/AMDGPUUsage.html#amdgpu-amdhsa-vgpr-register-set-up-order-table */
         let vgprs: Vec<Reg> = match kcode.pgm_props.enable_vgpr_workitem_id {
             VGPRWorkItemId::X => {
-                bindings.push(Binding::WorkitemIdX);
+                bindings.push(Binding::InitState(BuiltIn::WorkitemIdX));
                 vec![Reg(bindings.len() - 1, 0)]
             },
             VGPRWorkItemId::XY => {
-                bindings.push(Binding::WorkitemIdX);
-                bindings.push(Binding::WorkitemIdY);
+                bindings.push(Binding::InitState(BuiltIn::WorkitemIdX));
+                bindings.push(Binding::InitState(BuiltIn::WorkitemIdY));
                 vec![Reg(bindings.len() - 2, 0), Reg(bindings.len() - 1, 0)]
             },
             VGPRWorkItemId::XYZ => {
-                bindings.push(Binding::WorkitemIdX);
-                bindings.push(Binding::WorkitemIdY);
-                bindings.push(Binding::WorkitemIdZ);
+                bindings.push(Binding::InitState(BuiltIn::WorkitemIdX));
+                bindings.push(Binding::InitState(BuiltIn::WorkitemIdY));
+                bindings.push(Binding::InitState(BuiltIn::WorkitemIdZ));
                 vec![Reg(bindings.len() - 3, 0), Reg(bindings.len() - 2, 0), Reg(bindings.len() - 1, 0)]
             }
         };
