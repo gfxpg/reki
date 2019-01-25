@@ -1,11 +1,13 @@
-pub mod kernel_meta;
+pub mod kernel_code;
+pub mod kernel_args;
 
 use std::io;
 use std::ffi::CString;
 use std::convert::TryFrom;
 use llvm_sys::disassembler::{LLVMCreateDisasmCPU, LLVMDisasmInstruction, LLVMDisasmDispose};
 
-use self::kernel_meta::{extract_kernel_args, KernelCode, KernelArg};
+use self::kernel_args::{extract_kernel_args, KernelArg};
+use self::kernel_code::KernelCode;
 
 pub type Instruction = (String, Vec<Operand>);
 

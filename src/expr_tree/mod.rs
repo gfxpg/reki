@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use asm::kernel_meta::KernelArg;
+use asm::kernel_args::KernelArg;
 use data_flow::types::{Program, Statement, Binding, BuiltIn, DataKind, Expr};
 use data_flow::exec_state::ExecState;
 

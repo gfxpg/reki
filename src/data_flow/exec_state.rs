@@ -1,4 +1,4 @@
-use asm::kernel_meta::{KernelCode, VGPRWorkItemId};
+use asm::kernel_code::{KernelCode, VGPRWorkItemId};
 use data_flow::types::{Binding, BuiltIn, Variable, Reg, Condition};
 
 #[derive(Clone)]
