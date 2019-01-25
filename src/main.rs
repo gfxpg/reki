@@ -34,5 +34,5 @@ fn main() {
 
     println!("State: {:?}", state);
 
-    expr_tree::build(state, program);
+    expr_tree::build(&kernel_args, state, program);
 }
