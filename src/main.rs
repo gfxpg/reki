@@ -10,6 +10,7 @@ extern crate itertools;
 mod asm;
 mod control_flow;
 mod data_flow;
+mod expr_tree;
 
 use std::path::PathBuf;
 
@@ -31,5 +32,7 @@ fn main() {
     let mut state = data_flow::exec_state::ExecState::from(kcode);
     let program = data_flow::analyze(&mut state, instructions.as_slice(), &cf_map);
 
-    println!("Program: {:#?}", program);
+    println!("State: {:?}", state);
+
+    expr_tree::build(state, program);
 }

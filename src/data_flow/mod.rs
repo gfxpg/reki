@@ -1,5 +1,5 @@
 pub mod exec_state;
-mod types;
+pub mod types;
 mod ops;
 
 use itertools::Itertools;
