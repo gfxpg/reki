@@ -31,13 +31,15 @@ pub fn build(args: &KernelArgs, st: ExecState, program: Program) {
     for (_, stmt) in program {
         println!("{:?}", stmt);
         match stmt {
-            Statement::DwordVarAssignment { binding_idx, var_idx, .. } if binding_idx < std::usize::MAX => {
+            Statement::VarAssignment { binding_idx, var_idx, .. } if binding_idx < std::usize::MAX => {
+                // TODO FIXME: handle binding_dword and data kind
                 println!("binding {:?} -> var {:?}", binding_idx, var_idx);
                 var_bindings.insert(binding_idx, var_idx);
                 let expr = reduce_binding_to_expr(binding_idx, &st.bindings, &var_bindings, args);
                 stmts.push(ProgramStatement::Assignment { var_idx, expr });
-            }
-            _ => ()
+            },
+            Statement::VarAssignment { .. } => (), // std::usize::max => uninitialized register state
+            unhandled => panic!("Unhandled statement: {:?}", unhandled)
         }
     }
 

@@ -67,9 +67,7 @@ pub enum Statement {
     Store { addr: BindingIdx, data: BindingIdx, kind: DataKind },
     Label { index: usize },
     VarDecl { var_idx: usize },
-    DwordVarAssignment { var_idx: usize, binding_idx: BindingIdx, binding_dword: u8, var_dword: u8 },
-    QwordVarAssignment { var_idx: usize, binding_idx: BindingIdx, binding_dword: u8, var_dword: u8 },
-    DQwordVarAssignment { var_idx: usize, binding_idx: BindingIdx, binding_dword: u8, var_dword: u8 }
+    VarAssignment { var_idx: usize, binding_idx: BindingIdx, binding_dword: u8, var_dword: u8, kind: DataKind },
 }
 
 #[derive(Debug, Copy, Clone)]

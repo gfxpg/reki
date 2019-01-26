@@ -7,7 +7,7 @@ use itertools::Itertools;
 use asm::Instruction;
 use control_flow::ControlFlowMap;
 use self::exec_state::ExecState;
-use self::types::{Program, Reg, Statement, Binding, Variable};
+use self::types::{Program, Reg, Statement, Binding, Variable, DataKind};
 
 pub fn analyze(st: &mut ExecState, instrs: &[Instruction], cf_map: &ControlFlowMap) -> Program {
     eval_instructions_within_block(st, instrs.iter().enumerate(), instrs.len(), cf_map)
@@ -176,12 +176,19 @@ fn create_assignments(assignments: &mut Vec<Statement>, var_regs: &[Reg], var_id
 
         let assignment_dwords = 1 + binding_hi_dword - binding_dword;
 
-        assignments.push(match assignment_dwords {
-            1 => Statement::DwordVarAssignment { var_idx, binding_idx, binding_dword, var_dword: i as u8 },
-            2 => Statement::QwordVarAssignment { var_idx, binding_idx, binding_dword, var_dword: i as u8 },
-            4 => Statement::DQwordVarAssignment { var_idx, binding_idx, binding_dword, var_dword: i as u8 },
+        let assignment_kind = match assignment_dwords {
+            1 => DataKind::Dword,
+            2 => DataKind::Qword,
+            4 => DataKind::DQword,
             n => panic!("{}-word variables are not supported", n)
-        });
+        };
+
+        assignments.push(Statement::VarAssignment {
+            var_idx,
+            binding_idx,
+            binding_dword,
+            var_dword: i as u8,
+            kind: assignment_kind });
 
         i += assignment_dwords as usize;
     }
