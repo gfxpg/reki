@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use asm::kernel_args::{KernelArg, KernelArgs};
-use data_flow::types::{Program, Statement, Binding, BuiltIn, DataKind, Expr};
+use data_flow::types::{Program, Statement, Binding, BuiltIn, DataKind, Expr, Condition};
 use data_flow::exec_state::ExecState;
 
 #[derive(Debug)]
@@ -9,6 +9,11 @@ pub enum BoundExpr {
     Mul(Box<BoundExpr>, Box<BoundExpr>),
     Add(Box<BoundExpr>, Box<BoundExpr>),
     And(Box<BoundExpr>, Box<BoundExpr>),
+    Shl(Box<BoundExpr>, Box<BoundExpr>),
+    CompareLt(Box<BoundExpr>, Box<BoundExpr>),
+    CompareEql(Box<BoundExpr>, Box<BoundExpr>),
+    Negate(Box<BoundExpr>),
+    Cast(Box<BoundExpr>, DataKind),
     I32(i32),
     U32(u32),
     InitState(BuiltIn),
@@ -19,7 +24,11 @@ pub enum BoundExpr {
 
 #[derive(Debug)]
 pub enum ProgramStatement {
-    Assignment { var_idx: usize, expr: BoundExpr }
+    Declaration { var_idx: usize },
+    Assignment { var_idx: usize, expr: BoundExpr },
+    JumpIf { label_idx: usize, cond: BoundExpr },
+    Label { label_idx: usize },
+    Store { addr: usize, data: BoundExpr, kind: DataKind }
 }
 
 pub fn build(args: &KernelArgs, st: ExecState, program: Program) {
@@ -39,6 +48,37 @@ pub fn build(args: &KernelArgs, st: ExecState, program: Program) {
                 stmts.push(ProgramStatement::Assignment { var_idx, expr });
             },
             Statement::VarAssignment { .. } => (), // std::usize::max => uninitialized register state
+            Statement::VarDecl { var_idx } => {
+                stmts.push(ProgramStatement::Declaration { var_idx })
+            },
+            Statement::JumpIf { cond, label_idx } => {
+                let cond_expr = match cond {
+                    Condition::Lt(lhs, rhs) =>
+                        BoundExpr::CompareLt(Box::new(reduce_binding_to_expr(lhs, &st.bindings, &var_bindings, args)),
+                                             Box::new(reduce_binding_to_expr(rhs, &st.bindings, &var_bindings, args))),
+                    Condition::Eql(lhs, rhs) =>
+                        BoundExpr::CompareEql(Box::new(reduce_binding_to_expr(lhs, &st.bindings, &var_bindings, args)),
+                                              Box::new(reduce_binding_to_expr(rhs, &st.bindings, &var_bindings, args)))
+                };
+                stmts.push(ProgramStatement::JumpIf { label_idx, cond: cond_expr });
+            },
+            Statement::JumpUnless { cond, label_idx } => {
+                let cond_expr = match cond {
+                    Condition::Lt(lhs, rhs) =>
+                        BoundExpr::CompareLt(Box::new(reduce_binding_to_expr(lhs, &st.bindings, &var_bindings, args)),
+                                             Box::new(reduce_binding_to_expr(rhs, &st.bindings, &var_bindings, args))),
+                    Condition::Eql(lhs, rhs) =>
+                        BoundExpr::CompareEql(Box::new(reduce_binding_to_expr(lhs, &st.bindings, &var_bindings, args)),
+                                              Box::new(reduce_binding_to_expr(rhs, &st.bindings, &var_bindings, args)))
+                };
+                stmts.push(ProgramStatement::JumpIf { label_idx, cond: BoundExpr::Negate(Box::new(cond_expr)) });
+            },
+            Statement::Label { index } => {
+                stmts.push(ProgramStatement::Label { label_idx: index })
+            },
+            Statement::Store { addr, data, kind } => {
+                stmts.push(ProgramStatement::Store { addr, kind, data: reduce_binding_to_expr(data, &st.bindings, &var_bindings, args) })
+            },
             unhandled => panic!("Unhandled statement: {:?}", unhandled)
         }
     }
@@ -62,6 +102,10 @@ fn reduce_binding_to_expr(idx: usize, bindings: &Vec<Binding>, vars: &HashMap<us
                     BoundExpr::And(Box::new(reduce_binding_to_expr(lhs, bindings, vars, args)),
                                    Box::new(reduce_binding_to_expr(rhs, bindings, vars, args)))
                 },
+                Expr::Shl(lhs, rhs) => {
+                    BoundExpr::Shl(Box::new(reduce_binding_to_expr(lhs, bindings, vars, args)),
+                                   Box::new(reduce_binding_to_expr(rhs, bindings, vars, args)))
+                },
                 _ => panic!("Unhandled expr: {:?}", expr)
             }
         },
@@ -83,6 +127,9 @@ fn reduce_binding_to_expr(idx: usize, bindings: &Vec<Binding>, vars: &HashMap<us
                 },
                 _ => panic!("Unable to resolve dword element #{:?} of {:?}", dword, bindings[of])
             }
+        },
+        Binding::Cast { source, kind } => {
+            BoundExpr::Cast(Box::new(reduce_binding_to_expr(source, bindings, vars, args)), kind)
         },
         other => panic!("Unhandled binding: {:?}", other)
     }
