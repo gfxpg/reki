@@ -1,11 +1,25 @@
-#[derive(Default, Debug)]
+#[derive(Default, Debug, Clone)]
 pub struct KernelArg {
     pub name: String,
     pub size: u32,
     pub offset: u32
 }
 
-pub fn extract_kernel_args(section_note: &Vec<u8>) -> Vec<KernelArg> {
+#[derive(Debug)]
+pub struct KernelArgs(Vec<KernelArg>);
+
+impl KernelArgs {
+    pub fn find_idx_and_dword(&self, at_offset: u32) -> Option<(usize, u8)> {
+        self.0.iter()
+            .enumerate()
+            .take_while(|&(_, KernelArg { offset, .. })| *offset <= at_offset)
+            .map(|(idx, _)| idx)
+            .last()
+            .map(|idx| (idx, ((at_offset - idx as u32) / 2) as u8))
+    }
+}
+
+pub fn extract_kernel_args(section_note: &Vec<u8>) -> KernelArgs {
     let cl_note: Vec<u8> = section_note
         .iter()
         .skip_while(|&&c| c != '\n' as u8)
@@ -29,7 +43,7 @@ pub fn extract_kernel_args(section_note: &Vec<u8>) -> Vec<KernelArg> {
 
     let mut offset = 0;
 
-    args_raw
+    let args = args_raw
         .into_iter()
         .map(|args| {
             let name = args.iter().find(|e| e.starts_with("Name")).map(|e| &e[5..])
@@ -43,6 +57,8 @@ pub fn extract_kernel_args(section_note: &Vec<u8>) -> Vec<KernelArg> {
             offset += size;
             KernelArg { name, size, offset: offset - size }
         })
-        .collect()
+        .collect();
+
+    KernelArgs(args)
 }
 

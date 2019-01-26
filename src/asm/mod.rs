@@ -6,7 +6,7 @@ use std::ffi::CString;
 use std::convert::TryFrom;
 use llvm_sys::disassembler::{LLVMCreateDisasmCPU, LLVMDisasmInstruction, LLVMDisasmDispose};
 
-use self::kernel_args::{extract_kernel_args, KernelArg};
+use self::kernel_args::{extract_kernel_args, KernelArgs};
 use self::kernel_code::KernelCode;
 
 pub type Instruction = (String, Vec<Operand>);
@@ -23,7 +23,7 @@ pub enum Operand {
     Keyseq(String)
 }
 
-pub type Disassembly = (KernelCode, Vec<KernelArg>, Vec<Instruction>);
+pub type Disassembly = (KernelCode, KernelArgs, Vec<Instruction>);
 
 pub fn disassemble(bin: elf::File) -> io::Result<Disassembly> {
     let mut pgm_data = bin
