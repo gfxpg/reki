@@ -31,8 +31,6 @@ fn main() {
 
     let tree = expr_tree::build(&kernel_args, state, program);
 
-    println!("Tree: {:#?}", tree);
-
     let code = codegen::emit_c(tree, &kernel_args).unwrap();
-    println!("Code: {}", code);
+    println!("Code:\n{}", code);
 }

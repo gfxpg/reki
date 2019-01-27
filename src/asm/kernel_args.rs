@@ -25,6 +25,13 @@ impl KernelArgs {
     }
 }
 
+impl std::ops::Index<usize> for KernelArgs {
+    type Output = KernelArg;
+    fn index(&self, index: usize) -> &Self::Output {
+        &self.0[index]
+    }
+}
+
 pub fn extract_kernel_args(section_note: &Vec<u8>) -> KernelArgs {
     let cl_note: Vec<u8> = section_note
         .iter()
