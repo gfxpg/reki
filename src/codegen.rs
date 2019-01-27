@@ -2,12 +2,13 @@ mod transforms;
 
 use std::process::{Command, Stdio};
 
+use crate::asm::kernel_args::KernelArgs;
 use crate::expr_tree::{ProgramStatement};
 
-pub fn emit_c(tree: Vec<ProgramStatement>) -> std::io::Result<String> {
+pub fn emit_c(tree: Vec<ProgramStatement>, args: &KernelArgs) -> std::io::Result<String> {
     use std::io::{Error, ErrorKind};
 
-    self::transforms::tree(tree)
+    self::transforms::tree(tree, args)
         .map_err(|fmt_e| Error::new(ErrorKind::Other, format!("{}", fmt_e)))
         .and_then(reformat_c)
 }

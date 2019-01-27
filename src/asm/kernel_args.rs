@@ -2,7 +2,9 @@
 pub struct KernelArg {
     pub name: String,
     pub size: u32,
-    pub offset: u32
+    pub offset: u32,
+    pub typename: Option<String>,
+    pub is_const: bool
 }
 
 #[derive(Debug)]
@@ -16,6 +18,10 @@ impl KernelArgs {
             .map(|(idx, _)| idx)
             .last()
             .map(|idx| (idx, ((at_offset - idx as u32) / 2) as u8))
+    }
+
+    pub fn iter(&self) -> std::slice::Iter<KernelArg> {
+        self.0.iter()
     }
 }
 
@@ -53,9 +59,12 @@ pub fn extract_kernel_args(section_note: &Vec<u8>) -> KernelArgs {
                 .parse::<u32>().unwrap();
             let alignment = args.iter().find(|e| e.starts_with("Align")).unwrap()[6..]
                 .parse::<u32>().unwrap();
+            let typename = args.iter().find(|e| e.starts_with("TypeName")).map(|e| e[9..].replace("'", ""));
+            let is_const = args.iter().any(|e| e == "IsConst:true");
+
             offset += offset % alignment;
             offset += size;
-            KernelArg { name, size, offset: offset - size }
+            KernelArg { name, size, offset: offset - size, typename, is_const }
         })
         .collect();
 

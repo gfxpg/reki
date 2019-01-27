@@ -33,6 +33,6 @@ fn main() {
 
     println!("Tree: {:#?}", tree);
 
-    let code = codegen::emit_c(tree).unwrap();
+    let code = codegen::emit_c(tree, &kernel_args).unwrap();
     println!("Code: {}", code);
 }
