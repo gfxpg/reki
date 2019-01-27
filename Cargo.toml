@@ -2,10 +2,14 @@
 name = "reki"
 version = "0.1.0"
 authors = ["timlathy <tim.labushev@gmail.com>"]
+build = "build.rs"
+links = "llvm"
 
 [dependencies]
 libc = "0.2"
-llvm-sys = "70"
 elf = "0.0.10"
 byteorder = "1"
 itertools = "0.7"
+
+[build-dependencies]
+cc = "1.0"

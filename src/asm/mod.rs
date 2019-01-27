@@ -4,10 +4,13 @@ pub mod kernel_args;
 use std::io;
 use std::ffi::CString;
 use std::convert::TryFrom;
-use llvm_sys::disassembler::{LLVMCreateDisasmCPU, LLVMDisasmInstruction, LLVMDisasmDispose};
 
 use self::kernel_args::{extract_kernel_args, KernelArgs};
 use self::kernel_code::KernelCode;
+
+extern {
+    fn llvm_disasm();
+}
 
 pub type Instruction = (String, Vec<Operand>);
 
@@ -52,43 +55,49 @@ pub fn disassemble(bin: elf::File) -> io::Result<Disassembly> {
 
 fn disassemble_instructions(instructions_raw: &mut [u8]) -> io::Result<Vec<Instruction>> {
     unsafe {
-        llvm_sys::target::LLVM_InitializeAllTargetInfos();
-        llvm_sys::target::LLVM_InitializeAllTargetMCs();
-        llvm_sys::target::LLVM_InitializeAllDisassemblers();
+        llvm_disasm();
     }
 
-    let asmctx = unsafe {
-        LLVMCreateDisasmCPU(
-            CString::new("amdgcn--amdhsa")?.as_ptr(),
-            CString::new("gfx900")?.as_ptr(),
-            std::ptr::null_mut(), 0, None, None)
-    };
+    Ok(vec![])
 
-    let mut instructions: Vec<Instruction> = Vec::new();
-
-    let mut pos = 0;
-    let mut instr_buf = [0u8; 256];
-    while pos < instructions_raw.len() {
-        unsafe {
-            pos += LLVMDisasmInstruction(asmctx,
-                instructions_raw.as_mut_ptr().offset(pos as isize),
-                (instructions_raw.len() - pos) as u64, 
-                0,
-                instr_buf.as_mut_ptr() as *mut i8,
-                256);
-        }
-        let tab_skip = 1;
-        let string_end = instr_buf.iter().position(|&r| r == 0).unwrap();
-        let instr_raw = std::str::from_utf8(&instr_buf[tab_skip..string_end]).unwrap();
-
-        instructions.push(parse_instruction(instr_raw));
-    }
-
-    unsafe {
-        LLVMDisasmDispose(asmctx);
-    }
-
-    Ok(instructions)
+//    unsafe {
+//        llvm_sys::target::LLVM_InitializeAllTargetInfos();
+//        llvm_sys::target::LLVM_InitializeAllTargetMCs();
+//        llvm_sys::target::LLVM_InitializeAllDisassemblers();
+//    }
+//
+//    let asmctx = unsafe {
+//        LLVMCreateDisasmCPU(
+//            CString::new("amdgcn--amdhsa")?.as_ptr(),
+//            CString::new("gfx900")?.as_ptr(),
+//            std::ptr::null_mut(), 0, None, None)
+//    };
+//
+//    let mut instructions: Vec<Instruction> = Vec::new();
+//
+//    let mut pos = 0;
+//    let mut instr_buf = [0u8; 256];
+//    while pos < instructions_raw.len() {
+//        unsafe {
+//            pos += LLVMDisasmInstruction(asmctx,
+//                instructions_raw.as_mut_ptr().offset(pos as isize),
+//                (instructions_raw.len() - pos) as u64, 
+//                0,
+//                instr_buf.as_mut_ptr() as *mut i8,
+//                256);
+//        }
+//        let tab_skip = 1;
+//        let string_end = instr_buf.iter().position(|&r| r == 0).unwrap();
+//        let instr_raw = std::str::from_utf8(&instr_buf[tab_skip..string_end]).unwrap();
+//
+//        instructions.push(parse_instruction(instr_raw));
+//    }
+//
+//    unsafe {
+//        LLVMDisasmDispose(asmctx);
+//    }
+//
+//    Ok(instructions)
 }
 
 fn parse_instruction(instr: &str) -> Instruction {
