@@ -11,6 +11,7 @@ mod asm;
 mod control_flow;
 mod data_flow;
 mod expr_tree;
+mod codegen;
 
 use std::path::PathBuf;
 
@@ -34,5 +35,10 @@ fn main() {
 
     println!("State: {:?}", state);
 
-    expr_tree::build(&kernel_args, state, program);
+    let tree = expr_tree::build(&kernel_args, state, program);
+
+    println!("Tree: {:#?}", tree);
+
+    let code = codegen::emit_c(tree).unwrap();
+    println!("Code: {}", code);
 }

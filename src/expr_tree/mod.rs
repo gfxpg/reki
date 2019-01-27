@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use asm::kernel_args::{KernelArg, KernelArgs};
+use asm::kernel_args::KernelArgs;
 use data_flow::types::{Program, Statement, Binding, BuiltIn, DataKind, Expr, Condition};
 use data_flow::exec_state::ExecState;
 
@@ -31,14 +31,13 @@ pub enum ProgramStatement {
     Store { addr: usize, data: BoundExpr, kind: DataKind }
 }
 
-pub fn build(args: &KernelArgs, st: ExecState, program: Program) {
+pub fn build(args: &KernelArgs, st: ExecState, program: Program) -> Vec<ProgramStatement> {
     /* Binding index -> variable index */
     let mut var_bindings: HashMap<usize, usize> = HashMap::new();
 
     let mut stmts: Vec<ProgramStatement> = Vec::with_capacity(var_bindings.len());
 
     for (_, stmt) in program {
-        println!("{:?}", stmt);
         match stmt {
             Statement::VarAssignment { binding_idx, var_idx, .. } if binding_idx < std::usize::MAX => {
                 // TODO FIXME: handle binding_dword and data kind
@@ -78,17 +77,16 @@ pub fn build(args: &KernelArgs, st: ExecState, program: Program) {
             },
             Statement::Store { addr, data, kind } => {
                 stmts.push(ProgramStatement::Store { addr, kind, data: reduce_binding_to_expr(data, &st.bindings, &var_bindings, args) })
-            },
-            unhandled => panic!("Unhandled statement: {:?}", unhandled)
+            }
         }
     }
 
-    println!("Program: {:#?}", stmts);
+    stmts
 }
 
 fn reduce_binding_to_expr(idx: usize, bindings: &Vec<Binding>, vars: &HashMap<usize, usize>, args: &KernelArgs) -> BoundExpr {
     match bindings[idx] {
-        Binding::Computed { expr, kind } => {
+        Binding::Computed { expr, kind: _ } => {
             match expr {
                 Expr::Mul(lhs, rhs) => {
                     BoundExpr::Mul(Box::new(reduce_binding_to_expr(lhs, bindings, vars, args)),
@@ -122,7 +120,7 @@ fn reduce_binding_to_expr(idx: usize, bindings: &Vec<Binding>, vars: &HashMap<us
         },
         Binding::DwordElement { of, dword } | Binding::QwordElement { of, dword } => {
             match bindings[of] {
-                Binding::Deref { ptr, offset, kind } => {
+                Binding::Deref { ptr, offset, kind: _ } => {
                     resolve_dereference(bindings, ptr, offset as u32 + dword as u32, DataKind::Dword, args)
                 },
                 _ => panic!("Unable to resolve dword element #{:?} of {:?}", dword, bindings[of])
@@ -135,15 +133,17 @@ fn reduce_binding_to_expr(idx: usize, bindings: &Vec<Binding>, vars: &HashMap<us
     }
 }
 
-fn resolve_dereference(bindings: &Vec<Binding>, ptr: usize, offset: u32, kind: DataKind, args: &KernelArgs) -> BoundExpr {
+fn resolve_dereference(bindings: &Vec<Binding>, ptr: usize, offset: u32, _kind: DataKind, args: &KernelArgs) -> BoundExpr {
     match bindings[ptr] {
-        PtrKernarg => {
+        Binding::InitState(BuiltIn::PtrKernarg { .. }) => {
             match args.find_idx_and_dword(offset) {
                 Some((arg_idx, dword)) => BoundExpr::DwordArg { arg_idx, dword },
                 None => panic!("Unable to resolve kernel argument at offset {}; args struct: {:#?}", offset, args)
             }
         },
-        pointer =>
-            panic!("Unable to resolve pointer derefence of {:?} at offset {}", pointer, offset)
+        pointer => {
+            eprintln!("Unable to resolve pointer derefence of {:?} at offset {}", pointer, offset);
+            BoundExpr::Placeholder
+        }
     }
 }
