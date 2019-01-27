@@ -1,8 +1,8 @@
 use std::collections::HashMap;
 
-use asm::kernel_args::KernelArgs;
-use data_flow::types::{Program, Statement, Binding, BuiltIn, DataKind, Expr, Condition};
-use data_flow::exec_state::ExecState;
+use crate::asm::kernel_args::KernelArgs;
+use crate::data_flow::types::{Program, Statement, Binding, BuiltIn, DataKind, Expr, Condition};
+use crate::data_flow::exec_state::ExecState;
 
 #[derive(Debug)]
 pub enum BoundExpr {

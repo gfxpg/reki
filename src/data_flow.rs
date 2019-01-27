@@ -4,8 +4,8 @@ mod ops;
 
 use itertools::Itertools;
 
-use asm::Instruction;
-use control_flow::ControlFlowMap;
+use crate::asm::Instruction;
+use crate::control_flow::ControlFlowMap;
 use self::exec_state::ExecState;
 use self::types::{Program, Reg, Statement, Binding, Variable, DataKind};
 
@@ -15,7 +15,7 @@ pub fn analyze(st: &mut ExecState, instrs: &[Instruction], cf_map: &ControlFlowM
 
 type InstructionIter<'a> = std::iter::Enumerate<std::slice::Iter<'a, Instruction>>;
 
-fn eval_instructions_within_block(st: &mut ExecState, mut instr_iter: InstructionIter, instr_count: usize, cf_map: &ControlFlowMap) -> Program {
+fn eval_instructions_within_block(st: &mut ExecState, mut instr_iter: InstructionIter<'_>, instr_count: usize, cf_map: &ControlFlowMap) -> Program {
     let mut pgm = Program::new();
 
     while let Some((instr_idx, (instr, ops))) = instr_iter.next() {
@@ -23,7 +23,7 @@ fn eval_instructions_within_block(st: &mut ExecState, mut instr_iter: Instructio
             pgm.push((instr_idx + 1, Statement::Label { index }));
         }
 
-        use control_flow::BranchKind;
+        use crate::control_flow::BranchKind;
         match cf_map.branch_at_instruction(instr_idx) {
             Some((BranchKind::Uncond, _, dst)) => {
                 if dst < instr_idx {
@@ -53,7 +53,7 @@ fn eval_instructions_within_block(st: &mut ExecState, mut instr_iter: Instructio
                 let block_instr_iter = instr_iter.clone().dropping_back(instr_count - dst);
                 let mut block = eval_instructions_within_block(&mut st_block, block_instr_iter, instr_count, cf_map);
 
-                let (mut declarations, mut assignments_executed, mut assignments_skipped) =
+                let (declarations, assignments_executed, assignments_skipped) =
                     block_variables(&mut st_block, st);
 
                 st.sgprs = st_block.sgprs;

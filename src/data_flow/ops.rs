@@ -1,6 +1,6 @@
-use data_flow::{Program, exec_state::ExecState};
-use data_flow::types::{Reg, Expr, Statement, Condition, Binding, BindingIdx, DataKind};
-use asm::{Operand, Operand::*};
+use crate::data_flow::{Program, exec_state::ExecState};
+use crate::data_flow::types::{Reg, Expr, Statement, Condition, Binding, BindingIdx, DataKind};
+use crate::asm::{Operand, Operand::*};
 
 macro_rules! insert_into {
     ($vec:expr, $index:expr, $contents:expr) => {

@@ -1,5 +1,5 @@
-use asm::kernel_code::{KernelCode, VGPRWorkItemId};
-use data_flow::types::{Binding, BuiltIn, Variable, Reg, Condition};
+use crate::asm::kernel_code::{KernelCode, VGPRWorkItemId};
+use crate::data_flow::types::{Binding, BuiltIn, Variable, Reg, Condition};
 
 #[derive(Clone)]
 pub struct ExecState {
@@ -14,7 +14,7 @@ pub struct ExecState {
 use std::fmt;
 
 impl fmt::Debug for ExecState {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         writeln!(f, "Bindings:")?;
         self.bindings.iter().enumerate()
             .try_for_each(|(i, binding)| writeln!(f, "{:4} {:?}", i, binding))?;

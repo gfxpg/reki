@@ -1,4 +1,4 @@
-use asm::{Instruction, Operand, Operand::*};
+use crate::asm::{Instruction, Operand, Operand::*};
 
 #[derive(Debug, Copy, Clone)]
 pub enum BranchKind {

@@ -1,12 +1,6 @@
 #![feature(try_from)]
 #![feature(slice_patterns)]
 
-extern crate llvm_sys;
-extern crate libc;
-extern crate elf;
-extern crate byteorder;
-extern crate itertools;
-
 mod asm;
 mod control_flow;
 mod data_flow;
