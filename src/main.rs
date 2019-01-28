@@ -1,5 +1,6 @@
 #![feature(try_from)]
 #![feature(slice_patterns)]
+#![feature(box_syntax)]
 #![feature(box_patterns)]
 
 mod asm;

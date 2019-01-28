@@ -53,24 +53,24 @@ pub fn build(args: &KernelArgs, st: ExecState, program: Program) -> Vec<ProgramS
             Statement::JumpIf { cond, label_idx } => {
                 let cond_expr = match cond {
                     Condition::Lt(lhs, rhs) =>
-                        BoundExpr::CompareLt(Box::new(reduce_binding_to_expr(lhs, &st.bindings, &var_bindings, args)),
-                                             Box::new(reduce_binding_to_expr(rhs, &st.bindings, &var_bindings, args))),
+                        BoundExpr::CompareLt(box reduce_binding_to_expr(lhs, &st.bindings, &var_bindings, args),
+                                             box reduce_binding_to_expr(rhs, &st.bindings, &var_bindings, args)),
                     Condition::Eql(lhs, rhs) =>
-                        BoundExpr::CompareEql(Box::new(reduce_binding_to_expr(lhs, &st.bindings, &var_bindings, args)),
-                                              Box::new(reduce_binding_to_expr(rhs, &st.bindings, &var_bindings, args)))
+                        BoundExpr::CompareEql(box reduce_binding_to_expr(lhs, &st.bindings, &var_bindings, args),
+                                              box reduce_binding_to_expr(rhs, &st.bindings, &var_bindings, args))
                 };
                 stmts.push(ProgramStatement::JumpIf { label_idx, cond: cond_expr });
             },
             Statement::JumpUnless { cond, label_idx } => {
                 let cond_expr = match cond {
                     Condition::Lt(lhs, rhs) =>
-                        BoundExpr::CompareLt(Box::new(reduce_binding_to_expr(lhs, &st.bindings, &var_bindings, args)),
-                                             Box::new(reduce_binding_to_expr(rhs, &st.bindings, &var_bindings, args))),
+                        BoundExpr::CompareLt(box reduce_binding_to_expr(lhs, &st.bindings, &var_bindings, args),
+                                             box reduce_binding_to_expr(rhs, &st.bindings, &var_bindings, args)),
                     Condition::Eql(lhs, rhs) =>
-                        BoundExpr::CompareEql(Box::new(reduce_binding_to_expr(lhs, &st.bindings, &var_bindings, args)),
-                                              Box::new(reduce_binding_to_expr(rhs, &st.bindings, &var_bindings, args)))
+                        BoundExpr::CompareEql(box reduce_binding_to_expr(lhs, &st.bindings, &var_bindings, args),
+                                              box reduce_binding_to_expr(rhs, &st.bindings, &var_bindings, args))
                 };
-                stmts.push(ProgramStatement::JumpIf { label_idx, cond: BoundExpr::Negate(Box::new(cond_expr)) });
+                stmts.push(ProgramStatement::JumpIf { label_idx, cond: BoundExpr::Negate(box cond_expr) });
             },
             Statement::Label { index } => {
                 stmts.push(ProgramStatement::Label { label_idx: index })
@@ -89,20 +89,20 @@ fn reduce_binding_to_expr(idx: usize, bindings: &Vec<Binding>, vars: &HashMap<us
         Binding::Computed { expr, kind: _ } => {
             match expr {
                 Expr::Mul(lhs, rhs) => {
-                    BoundExpr::Mul(Box::new(reduce_binding_to_expr(lhs, bindings, vars, args)),
-                                   Box::new(reduce_binding_to_expr(rhs, bindings, vars, args)))
+                    BoundExpr::Mul(box reduce_binding_to_expr(lhs, bindings, vars, args),
+                                   box reduce_binding_to_expr(rhs, bindings, vars, args))
                 },
                 Expr::Add(lhs, rhs) => {
-                    BoundExpr::Add(Box::new(reduce_binding_to_expr(lhs, bindings, vars, args)),
-                                   Box::new(reduce_binding_to_expr(rhs, bindings, vars, args)))
+                    BoundExpr::Add(box reduce_binding_to_expr(lhs, bindings, vars, args),
+                                   box reduce_binding_to_expr(rhs, bindings, vars, args))
                 },
                 Expr::And(lhs, rhs) => {
-                    BoundExpr::And(Box::new(reduce_binding_to_expr(lhs, bindings, vars, args)),
-                                   Box::new(reduce_binding_to_expr(rhs, bindings, vars, args)))
+                    BoundExpr::And(box reduce_binding_to_expr(lhs, bindings, vars, args),
+                                   box reduce_binding_to_expr(rhs, bindings, vars, args))
                 },
                 Expr::Shl(lhs, rhs) => {
-                    BoundExpr::Shl(Box::new(reduce_binding_to_expr(lhs, bindings, vars, args)),
-                                   Box::new(reduce_binding_to_expr(rhs, bindings, vars, args)))
+                    BoundExpr::Shl(box reduce_binding_to_expr(lhs, bindings, vars, args),
+                                   box reduce_binding_to_expr(rhs, bindings, vars, args))
                 },
                 _ => panic!("Unhandled expr: {:?}", expr)
             }
@@ -110,7 +110,7 @@ fn reduce_binding_to_expr(idx: usize, bindings: &Vec<Binding>, vars: &HashMap<us
         Binding::U32(val) => BoundExpr::U32(val),
         Binding::I32(val) => BoundExpr::I32(val),
         Binding::Deref { ptr, offset, kind } =>
-            BoundExpr::Deref { ptr: Box::new(reduce_binding_to_expr(ptr, bindings, vars, args)), offset, kind },
+            BoundExpr::Deref { ptr: box reduce_binding_to_expr(ptr, bindings, vars, args), offset, kind },
         Binding::InitState(builtin) =>
             BoundExpr::InitState(builtin),
         Binding::DwordElement { of, dword } if vars.contains_key(&of) => {
@@ -119,12 +119,12 @@ fn reduce_binding_to_expr(idx: usize, bindings: &Vec<Binding>, vars: &HashMap<us
         Binding::DwordElement { of, dword } | Binding::QwordElement { of, dword } => {
             match bindings[of] {
                 Binding::Deref { ptr, offset, kind: _ } =>
-                    BoundExpr::Deref { ptr: Box::new(reduce_binding_to_expr(ptr, bindings, vars, args)), offset: offset + dword as i32, kind: DataKind::Dword },
+                    BoundExpr::Deref { ptr: box reduce_binding_to_expr(ptr, bindings, vars, args), offset: offset + dword as i32, kind: DataKind::Dword },
                 _ => panic!("Unable to resolve dword element #{:?} of {:?}", dword, bindings[of])
             }
         },
         Binding::Cast { source, kind } =>
-            BoundExpr::Cast(Box::new(reduce_binding_to_expr(source, bindings, vars, args)), kind),
+            BoundExpr::Cast(box reduce_binding_to_expr(source, bindings, vars, args), kind),
         other => panic!("Unhandled binding: {:?}", other)
     }
 }
