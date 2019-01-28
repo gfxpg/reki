@@ -17,7 +17,7 @@ pub enum BoundExpr {
     I32(i32),
     U32(u32),
     InitState(BuiltIn),
-    DwordArg { arg_idx: usize, dword: u8 },
+    Deref { ptr: Box<BoundExpr>, offset: i32, kind: DataKind },
     Variable { idx: usize, dword: u8 },
     Placeholder
 }
@@ -109,41 +109,22 @@ fn reduce_binding_to_expr(idx: usize, bindings: &Vec<Binding>, vars: &HashMap<us
         },
         Binding::U32(val) => BoundExpr::U32(val),
         Binding::I32(val) => BoundExpr::I32(val),
-        Binding::Deref { ptr, offset, kind } => {
-            resolve_dereference(bindings, ptr, offset as u32, kind, args)
-        },
-        Binding::InitState(builtin) => {
-            BoundExpr::InitState(builtin)
-        },
+        Binding::Deref { ptr, offset, kind } =>
+            BoundExpr::Deref { ptr: Box::new(reduce_binding_to_expr(ptr, bindings, vars, args)), offset, kind },
+        Binding::InitState(builtin) =>
+            BoundExpr::InitState(builtin),
         Binding::DwordElement { of, dword } if vars.contains_key(&of) => {
             BoundExpr::Variable { idx: of, dword }
         },
         Binding::DwordElement { of, dword } | Binding::QwordElement { of, dword } => {
             match bindings[of] {
-                Binding::Deref { ptr, offset, kind: _ } => {
-                    resolve_dereference(bindings, ptr, offset as u32 + dword as u32, DataKind::Dword, args)
-                },
+                Binding::Deref { ptr, offset, kind: _ } =>
+                    BoundExpr::Deref { ptr: Box::new(reduce_binding_to_expr(ptr, bindings, vars, args)), offset: offset + dword as i32, kind: DataKind::Dword },
                 _ => panic!("Unable to resolve dword element #{:?} of {:?}", dword, bindings[of])
             }
         },
-        Binding::Cast { source, kind } => {
-            BoundExpr::Cast(Box::new(reduce_binding_to_expr(source, bindings, vars, args)), kind)
-        },
+        Binding::Cast { source, kind } =>
+            BoundExpr::Cast(Box::new(reduce_binding_to_expr(source, bindings, vars, args)), kind),
         other => panic!("Unhandled binding: {:?}", other)
-    }
-}
-
-fn resolve_dereference(bindings: &Vec<Binding>, ptr: usize, offset: u32, _kind: DataKind, args: &KernelArgs) -> BoundExpr {
-    match bindings[ptr] {
-        Binding::InitState(BuiltIn::PtrKernarg { .. }) => {
-            match args.find_idx_and_dword(offset) {
-                Some((arg_idx, dword)) => BoundExpr::DwordArg { arg_idx, dword },
-                None => panic!("Unable to resolve kernel argument at offset {}; args struct: {:#?}", offset, args)
-            }
-        },
-        pointer => {
-            eprintln!("Unable to resolve pointer derefence of {:?} at offset {}", pointer, offset);
-            BoundExpr::Placeholder
-        }
     }
 }

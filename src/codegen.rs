@@ -1,4 +1,5 @@
 mod transforms;
+mod ptr_resolution;
 
 use std::process::{Command, Stdio};
 

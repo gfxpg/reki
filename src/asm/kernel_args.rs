@@ -13,11 +13,11 @@ pub struct KernelArgs(Vec<KernelArg>);
 impl KernelArgs {
     pub fn find_idx_and_dword(&self, at_offset: u32) -> Option<(usize, u8)> {
         self.0.iter()
+            .map(|KernelArg { offset, .. }| offset)
             .enumerate()
-            .take_while(|&(_, KernelArg { offset, .. })| *offset <= at_offset)
-            .map(|(idx, _)| idx)
+            .take_while(|&(_, &offset)| offset <= at_offset)
             .last()
-            .map(|idx| (idx, ((at_offset - idx as u32) / 2) as u8))
+            .map(|(idx, offset)| (idx, ((at_offset - offset) / 2) as u8))
     }
 
     pub fn iter(&self) -> std::slice::Iter<KernelArg> {
