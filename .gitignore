@@ -1,1 +1,8 @@
+# Rust (WASM)
 target/
+
+# BuckleScript & Node
+.merlin
+node_modules/
+dist/
+lib/

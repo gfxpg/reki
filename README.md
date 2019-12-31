@@ -5,3 +5,6 @@ of general-purpose GPU computing.
 
 ## Development
 
+```
+npm run dev
+```
