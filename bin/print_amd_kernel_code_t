@@ -1,3 +1,0 @@
-#!/usr/bin/env bash
-objcopy -I elf64-little --dump-section .text=/dev/stdout "$1" \
-  | "$(dirname "$BASH_SOURCE")"/extract_bin_amd_kernel_code_t
