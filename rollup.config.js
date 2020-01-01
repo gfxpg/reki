@@ -13,7 +13,7 @@ export default {
     resolve(),
     commonjs({
       namedExports: {
-        'node_modules/react/index.js': ['createElement'],
+        'node_modules/react/index.js': ['createElement', 'useState'],
         'node_modules/react-dom/index.js': ['render'],
       },
     }),

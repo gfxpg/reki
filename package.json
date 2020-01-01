@@ -2,8 +2,9 @@
   "private": true,
   "scripts": {
     "build": "rollup -c",
+    "watch": "while inotifywait -qq -e close_write -r ./ui; do npm run build; done",
     "serve": "serve",
-    "dev": "concurrently --kill-others \"npm run build -- -w\" \"npm run serve\""
+    "dev": "concurrently --kill-others \"npm run watch\" \"npm run serve\""
   },
   "devDependencies": {
     "@rollup/plugin-commonjs": "^11.0.0",
