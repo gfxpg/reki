@@ -1,0 +1,8 @@
+[package]
+name = "reki"
+version = "0.1.0"
+authors = ["timlathy"]
+edition = "2018"
+
+[dependencies]
+elf = "0.0.10"

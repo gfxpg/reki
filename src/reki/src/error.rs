@@ -1,29 +1,28 @@
 use std::error::Error;
 use std::fmt;
-use wasm_bindgen::JsValue;
 
 pub type RekiResult<T> = Result<T, RekiError>;
 
 #[derive(Debug, Clone)]
-pub struct RekiError(js_sys::Error);
+pub struct RekiError(String);
 
 impl fmt::Display for RekiError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        f.write_str(&String::from(self.0.message()))
-    }
-}
-
-impl From< RekiError> for JsValue {
-    fn from(e: RekiError) -> Self {
-        e.0.into()
+        f.write_str(&self.0)
     }
 }
 
 impl Error for RekiError {}
 
+impl<'a> RekiError {
+    pub fn msg(&'a self) -> &'a str {
+        self.0.as_str()
+    }
+}
+
 impl From<&str> for RekiError {
     fn from(e: &str) -> Self {
-        RekiError(js_sys::Error::new(e))
+        RekiError(e.into())
     }
 }
 

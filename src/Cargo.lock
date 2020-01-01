@@ -65,7 +65,14 @@ name = "reki"
 version = "0.1.0"
 dependencies = [
  "elf 0.0.10 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
+name = "reki-wasm"
+version = "0.1.0"
+dependencies = [
  "js-sys 0.3.33 (registry+https://github.com/rust-lang/crates.io-index)",
+ "reki 0.1.0",
  "wasm-bindgen 0.2.56 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 

@@ -1,5 +1,5 @@
 [package]
-name = "reki"
+name = "reki-wasm"
 version = "0.1.0"
 authors = ["timlathy"]
 edition = "2018"
@@ -9,6 +9,6 @@ crate-type = ["cdylib"]
 path = "lib.rs"
 
 [dependencies]
+reki = { path = "reki/" }
 wasm-bindgen = "0.2.56"
 js-sys = "0.3.33"
-elf = "0.0.10"
